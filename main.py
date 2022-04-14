@@ -1,321 +1,597 @@
-# -*- coding: utf-8 -*-
+# Original Version: Taehoon Kim (http://carpedm20.github.io)
+#   + Source: https://github.com/carpedm20/DCGAN-tensorflow/blob/e30539fb5e20d5a0fed40935853da97e9e55eee8/model.py
+#   + License: MIT
+# [2016-08-05] Modifications for Completion: Brandon Amos (http://bamos.github.io)
+#   + License: MIT
+# [2017-07] Modifications for sText2Image: Shangzhe Wu
+#   + License: MIT
+
+from __future__ import division
+import os
+import time
+from glob import glob
 import tensorflow as tf
-import numpy as np
-import IPython.display
+import pickle
+from six.moves import xrange
+from scipy.stats import entropy
 
+from ops import *
+from utils import *
 
-if "X0" not in globals():
-    (X0, L0), (_, _) = tf.keras.datasets.mnist.load_data()
-    X0 = tf.cast(X0, tf.float32) / 255.0
-    X0 = tf.expand_dims(X0, -1)
+#import pdb
 
-def log_if_unsafe(func, msg="unsafe operation"):
-    '''Function wrapper. Warns if function is not called with safe param'''
-    def output_fn(*args, safe=False, **kwargs):
-        if not safe: print(f"Warning: {msg}")
-        return func(*args, **kwargs)
-    return output_fn
-
-
-class GAN_Core(tf.keras.Model):
-
-    def __init__(self, dis_model, gen_model, z_dims, z_sampler=tf.random.normal, **kwargs):
-
-        super().__init__(**kwargs)
-        self.z_dims = z_dims
-        self.z_sampler = log_if_unsafe(z_sampler, "z_sampler(shape, ...) is an internal function. Consider using sample_z(n)")
-        self.gen_model = gen_model
-        self.dis_model = dis_model
-        
-
-
-    def sample_z(self, num_samples, **kwargs):
-        '''generates a z realization from the z sampler'''
-        return self.z_sampler([num_samples, *self.z_dims[1:]], safe=True)
-    
-    def discriminate(self, inputs, **kwargs):
-        '''predict whether input input is a real entry from the true dataset'''
-        return self.dis_model(inputs, **kwargs)
-
-    def generate(self, z, **kwargs):
-        '''generates an output based on a specific z realization'''
-        return self.gen_model(z, **kwargs)
-
-
-    def call(self, inputs, **kwargs):
-        b_size = tf.shape(inputs)[0]
-        ## TODO: Implement call process per instructions
-        z_samp = self.sample_z(b_size)   ## Generate a z sample
-        g_samp = self.generate(z_samp)   ## Generate an x-like image
-        d_samp = self.discriminate(inputs)   ## Predict whether x-like is real
-        print(f'Z( ) Shape = {z_samp.shape}')
-        print(f'G(z) Shape = {g_samp.shape}')
-        print(f'D(x) Shape = {d_samp.shape}\n')
-        return d_samp
-
-    def build(self, input_shape, **kwargs):
-        super().build(input_shape=self.z_dims, **kwargs)
-
-
-bce_func = tf.keras.backend.binary_crossentropy ## optional
-acc_func = tf.keras.metrics.binary_accuracy     ## optional
-
-
-# TODO: fill in loss functions!
-def g_loss(d_fake:tf.Tensor, d_real:tf.Tensor) -> tf.Tensor:
-    l = bce_func(tf.ones_like(d_fake), d_fake)
-    return tf.reduce_mean(l)
-
-def d_loss(d_fake:tf.Tensor, d_real:tf.Tensor)  -> tf.Tensor:
-    l = bce_func(tf.zeros_like(d_fake), d_fake) 
-    l += bce_func(tf.ones_like(d_real), d_real)
-    return tf.reduce_mean(l)
-
-# TODO: fill in accuracy functions!
-def g_acc(d_fake:tf.Tensor, d_real:tf.Tensor) -> tf.Tensor:
-    return acc_func(tf.zeros_like(d_fake), d_fake)
-
-def d_acc_fake(d_fake:tf.Tensor, d_real:tf.Tensor)  -> tf.Tensor:
-    return acc_func(tf.ones_like(d_fake), d_fake)
-
-def d_acc_real(d_fake:tf.Tensor, d_real:tf.Tensor)  -> tf.Tensor:
-    return acc_func(tf.ones_like(d_real), d_real)
-
-################################################################################
-
-def test_metric(loss_fn, fake, real, expected):
-    value = loss_fn(tf.constant(fake), tf.constant(real)).numpy()
-    print(f'{loss_fn.__name__:11} with ' + 
-        f'fake {str(fake):15} and real {str(real):15} = ' + 
-        f'{value:6.3f}\t[{expected:6.3f}]')
-
-test_metric(d_loss,     [0., 0., 0.], [1., 1., 1.], -0.0)
-test_metric(d_loss,     [0., 0., 0.], [0., 0., 0.], 15.425)
-test_metric(d_loss,     [1., 1., 1.], [1., 1., 1.], 15.333)
-test_metric(d_loss,     [1., 1., 1.], [0., 0., 0.], 30.758)
-print()
-test_metric(g_loss,     [1., 1., 1.], [],           -0.0)
-test_metric(g_loss,     [0., 0., 0.], [],           15.425)
-print()
-test_metric(g_acc,      [.1, .9, .9], [],           0.667)
-test_metric(d_acc_fake, [.1, .9, .9], [],           0.333)
-test_metric(d_acc_real, [], [.1, .9, .9],           0.667)
-
-#@markdown You don't really have to look at it, so just run the block with the play button.
-
-#@markdown * If you open up the code, double-click the right side of the cell to hide it again 
-import matplotlib.pyplot as plt
-from PIL import Image
-import io
-
-class EpochVisualizer(tf.keras.callbacks.Callback):
-    def __init__(self, model, sample_inputs, **kwargs):
-        super().__init__(**kwargs)
-        self.model = model
-        self.sample_inputs = sample_inputs
-        self.imgs = [] 
-
-    def on_epoch_end(self, epoch, logs=None):
-        x_real, z_samp = self.sample_inputs
-        x_fake = self.model.gen_model(z_samp)
-        d_real = tf.nn.sigmoid(self.model.dis_model(x_real))
-        d_fake = tf.nn.sigmoid(self.model.dis_model(x_fake))
-        outputs = tf.concat([x_real, x_fake], axis=0)
-        labels  = [f"D(true x) = {np.round(100 * d, 0)}%" for d in d_real] 
-        labels += [f"D(fake x) = {np.round(100 * d, 0)}%" for d in d_fake]
-
-        self.add_to_imgs(
-            outputs = outputs,
-            labels = labels,
-            epoch = epoch
-        )
-
-    def add_to_imgs(self, outputs, labels, epoch, nrows=1, ncols=8, figsize=(16, 5)):
-        '''
-        Plot the image samples in outputs in a pyplot figure and add the image 
-        to the 'imgs' list. Used to later generate a gif. 
-        '''
-        fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
-        if nrows == 1: axs = np.array([axs])
-        fig.suptitle(f'Epoch {epoch+1}')
-        axs[0][0].set_title(f'Epoch {epoch+1}')
-        for i, ax in enumerate(axs.reshape(-1)):
-            out_numpy = np.squeeze(outputs[i].numpy(), -1)
-            ax.imshow(out_numpy, cmap='gray')
-            ax.set_title(labels[i])
-        self.imgs += [self.fig2img(fig)]
-        plt.close(fig)
-
-    @staticmethod
-    def fig2img(fig):
+class GAN(object):
+    def __init__(self, sess, image_size=64, is_crop=False,
+                 batch_size=64, text_vector_dim=100,
+                 z_dim=100, t_dim=256, gf_dim=64, df_dim=64, c_dim=3,
+                 checkpoint_dir=None, sample_dir=None, log_dir=None, 
+                 lam1=0.1, lam2=0.1, lam3=0.1):
         """
-        Convert a Matplotlib figure to a PIL Image and return it
-        https://stackoverflow.com/a/61754995/5003309
+
+        Args:
+            sess: TensorFlow session
+            batch_size: The size of batch. Should be specified before training.
+            z_dim: (optional) Dimension of dim for Z. [100]
+            t_dim: (optional) Dimension of text features. [256]
+            gf_dim: (optional) Dimension of gen filters in first conv layer. [64]
+            df_dim: (optional) Dimension of discrim filters in first conv layer. [64]
+            c_dim: (optional) Dimension of image color. [3]
+            lam1: (optional) Hyperparameter for contextual loss. [0.1]
+            lam2: (optional) Hyperparameter for perceptual loss. [0.1]
+            lam3: (optional) Hyperparameter for wrong examples [0.1]
         """
-        buf = io.BytesIO()
-        fig.savefig(buf)
-        buf.seek(0)
-        return Image.open(buf)
-    
-    def save_gif(self, filename='mnist_recon', loop=True, duration=500):
-        imgs = self.imgs
-        self.imgs[0].save(
-            filename+'.gif', save_all=True, append_images=self.imgs[1:], 
-            loop=loop, duration=duration)
+        self.sess = sess
+        self.is_crop = is_crop
+        self.batch_size = batch_size
+        self.text_vector_dim = text_vector_dim
+        self.image_size = image_size
+        self.image_shape = [image_size, image_size * 2, 3]
+        # self.image_shape = [image_size, image_size, 3]
 
+        self.sample_freq = int(100*64/batch_size)
+        self.save_freq = int(500*64/batch_size)
 
-leaky_relu = tf.keras.layers.LeakyReLU(0.01)
+        self.z_dim = z_dim
+        self.t_dim = t_dim
 
-def get_dis_model(name="dis_model"):
-    return tf.keras.Sequential([
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(256), 
-        tf.keras.layers.LeakyReLU(0.01),
-        tf.keras.layers.Dense(256), 
-        tf.keras.layers.LeakyReLU(0.01),
-        tf.keras.layers.Dense(1, activation="sigmoid")
-    ], name=name)
+        self.gf_dim = gf_dim
+        self.df_dim = df_dim
 
-def get_gen_model(name="gen_model"):
-    return tf.keras.Sequential([
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(1000), 
-        tf.keras.layers.LeakyReLU(0.01),
-        tf.keras.layers.Dense(1000), 
-        tf.keras.layers.LeakyReLU(0.01),
-        tf.keras.layers.Dense(784, activation="tanh"), 
-        tf.keras.layers.Reshape((28, 28, 1))
-    ], name=name)
+        self.lam1 = lam1
+        self.lam2 = lam2
+        self.lam3 = lam3
 
-gan_model = GAN_Core(    
-    dis_model = get_dis_model(), 
-    gen_model = get_gen_model(), 
-    z_dims = (None, 96),
-    name="gan"
-)
+        self.c_dim = 3
 
-gan_model.build(input_shape = X0.shape)
-# gan_model.summary()
-gan_model.gen_model.summary()
-gan_model.dis_model.summary()
+        # batch normalization : deals with poor initialization helps gradient flow
+        self.d_bn1 = batch_norm(name='d_bn1')
+        self.d_bn2 = batch_norm(name='d_bn2')
+        self.d_bn3 = batch_norm(name='d_bn3')
+        self.d_bn4 = batch_norm(name='d_bn4')
 
-class GAN(GAN_Core):
+        self.g_bn0 = batch_norm(name='g_bn0')
+        self.g_bn1 = batch_norm(name='g_bn1')
+        self.g_bn2 = batch_norm(name='g_bn2')
+        self.g_bn3 = batch_norm(name='g_bn3')
 
-    def compile(self, optimizers, losses, accuracies, **kwargs):
-        super().compile(
-            loss        = losses.values(),
-            optimizer   = optimizers.values(),
-            metrics     = accuracies.values(),
-            **kwargs
-        )
-        self.loss_funcs = losses
-        self.optimizers = optimizers
-        self.acc_funcs  = accuracies
-
-
-    def fit(self, *args, d_steps=1, g_steps=1, **kwargs):
-        self.g_steps = g_steps
-        self.d_steps = d_steps
-        super().fit(*args, **kwargs)
-
-
-    def test_step(self, data): 
-        x_real, l_real = data
-        batch_size = tf.shape(x_real)[0]
-
-        ## TODO: Generate the inputs for the loss functions: 
-        ## - x_real: Real Images from dataset
-        ## - d_real: The discriminator's prediction of the reals
-        ## - x_fake: Images generated by generator
-        ## - d_fake: The discriminator's prediction of the fakes
-        z = self.sample_z(l_real)
-        x_fake = self.gen_model(z)
-        d_fake = self.dis_model(x_fake)
-        d_real = self.dis_model(x_real)
-
-        ########################################################################
-
-        all_funcs = {**self.loss_funcs, **self.acc_funcs}
-        return { key : fun(d_fake, d_real) for key, fun in all_funcs.items() }
-
-    
-    def train_step(self, data):
-        x_real, l_real = data
-        batch_size = tf.shape(x_real)[0]
-
-        ## TODO: Sample z realization to maintain some batch-level consistency
-        z = self.sample_z(l_real)
-          
-        ## TODO: Train the discriminator for `self.d_steps` steps
-        with tf.GradientTape() as tape:
-          x_fake = self.gen_model(z, trainable=False)
-          d_fake = self.dis_model(x_fake, trainable=True)
-          d_real = self.dis_model(x_real, trainable=True)
-          loss_fn  = self.loss_funcs['d_loss'](d_fake, d_real) ## HINT
+        self.checkpoint_dir = checkpoint_dir
+        self.sample_dir = sample_dir
+        self.log_dir = log_dir
         
-        optimizer = self.optimizers['d_opt']  ## HINT
-        train_vars = self.dis_model.trainable_variables
-        gradients = tape.gradient(loss_fn, train_vars)
-        optimizer.apply_gradients(zip(gradients, train_vars))
+        self.build_model()
 
-        ## TODO: Train the generator for `self.g_steps` steps
-        with tf.GradientTape() as tape:
-          x_fake = self.gen_model(z, trainable=True)
-          d_fake = self.dis_model(x_fake, trainable=False)
-          d_real = self.dis_model(x_real, trainable=False)
-          loss_fn  = self.loss_funcs['g_loss'](d_fake, d_real) ## HINT
+        self.model_name = "GAN"
+
         
-        optimizer = self.optimizers['g_opt']  ## HINT
-        train_vars = self.gen_model.trainable_variables
-        gradients = tape.gradient(loss_fn, train_vars)
-        optimizer.apply_gradients(zip(gradients, train_vars))
+    def build_model(self):
+        self.images = tf.placeholder(
+            tf.float32, [self.batch_size] + self.image_shape, name='real_images')
+        self.sample_images= tf.placeholder(
+            tf.float32, [self.batch_size] + self.image_shape, name='sample_images')
 
-        ## TODO: Compute final states for metric computation (if necessary)
-        x_fake = self.gen_model(z, trainable=False)
-        d_fake = self.dis_model(x_fake, trainable=False)
-        d_real = self.dis_model(x_real, trainable=False)
+        self.z = tf.placeholder(tf.float32, [self.batch_size, self.z_dim], name='z')
+        self.z_sum = tf.summary.histogram("z", self.z)
 
-        ########################################################################
+        self.t = tf.placeholder(tf.float32, [self.batch_size, self.text_vector_dim], name='t')
+        self.t_sum = tf.summary.histogram("t", self.t)
 
-        all_funcs = {**self.loss_funcs, **self.acc_funcs}
-        return { key : fun(d_fake, d_real) for key, fun in all_funcs.items() }
+        self.t_wr = tf.placeholder(tf.float32, [self.batch_size, self.text_vector_dim], name='t_wr')
+        self.t_wr_sum = tf.summary.histogram("t_wr", self.t_wr)
 
-gan_model = GAN(   
-    dis_model = get_dis_model(), 
-    gen_model = get_gen_model(), 
-    z_dims    = (None, 96),
-    name      = "gan"
-)
+        #self.images_wr = tf.placeholder(
+        #    tf.float32, [self.batch_size] + self.image_shape, name='wrong_images')
 
-gan_model.compile(
-    optimizers = {
-        'd_opt' : tf.keras.optimizers.Adam(1e-3, beta_1=0.5), 
-        'g_opt' : tf.keras.optimizers.Adam(1e-3, beta_1=0.5), 
-    },
-    losses = {
-        'd_loss' : d_loss,
-        'g_loss' : g_loss,
-    },
-    accuracies = {
-        'd_acc_real' : d_acc_real,
-        'd_acc_fake' : d_acc_fake,
-        'g_acc'      : g_acc,
-    }
-)
+        self.G = self.generator(self.z, self.t)
+        self.D_rl, self.D_logits_rl = self.discriminator(self.images, self.t)
+        self.D_fk, self.D_logits_fk = self.discriminator(self.G, self.t, reuse=True)
+        self.D_wr, self.D_logits_wr = self.discriminator(self.images, self.t_wr, reuse=True)
 
-train_num = 10000       ## Feel free to bump this up to 50000 when your architecture is done
-true_sample = X0[train_num-2:train_num+2]       ## 4 real images
-fake_sample = gan_model.sample_z(4)             ## 4 z realizations
-viz_callback = EpochVisualizer(gan_model, [true_sample, fake_sample])
+        self.sampler = self.sampler(self.z, self.t)
 
-gan_model.fit(
-    X0[:train_num], L0[:train_num], 
-    d_steps    = 5, 
-    g_steps    = 5, 
-    epochs     = 10, ## Feel free to bump this up to 20 when your architecture is done
-    batch_size = 50,
-    callbacks  = [viz_callback]
-)
+        self.G_sum = tf.image_summary("G", self.G)
+        self.d_rl_sum = tf.summary.histogram("d", self.D_rl)
+        self.d_fk_sum = tf.summary.histogram("d_", self.D_fk)
+        self.d_wr_sum = tf.summary.histogram("d_wr", self.D_wr)
 
-viz_callback.save_gif('generation')
-IPython.display.Image(open('generation.gif','rb').read())
+        # cross entropy loss
+        self.g_loss = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(self.D_logits_fk,
+                                                    tf.ones_like(self.D_fk)))
+        self.d_loss_real = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(self.D_logits_rl,
+                                                    tf.ones_like(self.D_rl)))
+        self.d_loss_fake = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(self.D_logits_fk,
+                                                    tf.zeros_like(self.D_fk)))
+        self.d_loss_wrong = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(self.D_logits_wr,
+                                                    tf.zeros_like(self.D_wr)))
+
+        '''
+        # least square loss
+        self.d_loss_real = 0.5 * tf.reduce_mean((self.D_logits_rl - tf.ones_like(self.D_logits_rl))**2)
+        self.d_loss_fake = 0.5 * tf.reduce_mean((self.D_logits_fk - tf.zeros_like(self.D_logits_fk))**2)
+        self.d_loss_wrong = 0.5 * tf.reduce_mean((self.D_logits_wr - tf.zeros_like(self.D_logits_wr))**2)
+        self.g_loss = 0.5 * tf.reduce_mean((self.D_logits_fk - tf.ones_like(self.D_logits_fk))**2)
+        '''
+
+        self.d_loss_real_sum = tf.scalar_summary("d_loss_real", self.d_loss_real)
+        self.d_loss_fake_sum = tf.scalar_summary("d_loss_fake", self.d_loss_fake)
+        self.d_loss_wrong_sum = tf.scalar_summary("d_loss_wrong", self.d_loss_wrong)
+
+        self.d_loss = self.d_loss_real + self.d_loss_fake + self.lam3 * self.d_loss_wrong
+
+        self.g_loss_sum = tf.scalar_summary("g_loss", self.g_loss)
+        self.d_loss_sum = tf.scalar_summary("d_loss", self.d_loss)
+
+        t_vars = tf.trainable_variables()
+
+        self.d_vars = [var for var in t_vars if 'd_' in var.name]
+        self.g_vars = [var for var in t_vars if 'g_' in var.name]
+
+        self.saver = tf.train.Saver(max_to_keep=50)
+
+        # mask to generate
+        self.mask = tf.placeholder(tf.float32, [None] + self.image_shape, name='mask')
+        
+        # l1
+        #self.contextual_loss = tf.reduce_sum(
+        #    tf.contrib.layers.flatten(
+        #        tf.abs(tf.mul(self.mask, self.G) - tf.mul(self.mask, self.images))), 1)
+        
+        # kl divergence
+        self.contextual_loss = kl_divergence(
+            tf.divide(tf.add(tf.contrib.layers.flatten(tf.image.rgb_to_grayscale(
+                tf.slice(self.G, [0,0,0,0], [self.batch_size,self.image_size,self.image_size,self.c_dim]))), 1), 2),
+            tf.divide(tf.add(tf.contrib.layers.flatten(tf.image.rgb_to_grayscale(
+                tf.slice(self.images, [0,0,0,0], [self.batch_size,self.image_size,self.image_size,self.c_dim]))), 1), 2))
+        
+        self.perceptual_loss = self.g_loss
+        self.complete_loss = self.lam1*self.contextual_loss + self.lam2*self.perceptual_loss
+        self.grad_complete_loss = tf.gradients(self.complete_loss, self.z)
+
+        
+    def train(self, config):
+        image_data = glob(os.path.join(config.dataset, "*.png"))
+        #np.random.shuffle(data)
+        print (os.path.join(config.dataset, "*.png"))
+        assert(len(image_data) > 0)
+        
+        text_data = pickle.load(open(config.text_path, 'rb'))
+        
+        ######### for face attributes #########
+        attr_sum = np.sum(text_data, 0)
+        attr_percent = (1 + attr_sum/len(text_data)) / 2
+        print ("selected attribute percentages:\n", attr_percent)
+        ######### for face attributes #########
+        
+        d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
+                          .minimize(self.d_loss, var_list=self.d_vars)
+        g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
+                          .minimize(self.g_loss, var_list=self.g_vars)
+        tf.initialize_all_variables().run()
+
+        self.g_sum = tf.merge_summary(
+            [self.z_sum, self.t_sum, self.d_fk_sum, self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
+        self.d_sum = tf.merge_summary(
+            [self.z_sum, self.t_sum, self.d_rl_sum, self.d_wr_sum, self.d_loss_real_sum, self.d_loss_wrong_sum, self.d_loss_sum])
+        self.writer = tf.train.SummaryWriter(self.log_dir, self.sess.graph)
+
+        
+        #++++++++ training sample ++++++++#
+        
+        sample_z = np.random.uniform(-1, 1, size=(self.batch_size , self.z_dim))
+        sample_files = image_data[0:self.batch_size]
+        sample = [get_image(sample_file, self.image_size, is_crop=self.is_crop) for sample_file in sample_files]
+        sample_images = np.array(sample).astype(np.float32)
+        sample_t_ = [get_text_batch(os.path.basename(sample_file), text_data) for sample_file in sample_files]
+        sample_t = np.array(sample_t_).astype(np.float32)
+        nRows = np.ceil(self.batch_size/8)
+        nCols = min(8, self.batch_size) #8
+
+        ######### for face attributes #########
+        with open(os.path.join(self.sample_dir, 'sampled_texts.txt'), 'wb') as f:
+            np.savetxt(f, sample_t, fmt='%i', delimiter='\t')
+        ######### for face attributes #########
+
+        #-------- training sample --------#
+
+        counter = 1
+        start_time = time.time()
+
+        if self.load(self.checkpoint_dir):
+            print("""
+
+============
+An existing model was found in the checkpoint directory.
+If you just cloned this repository, it's Brandon Amos'
+trained model for faces that's used in the post.
+If you want to train a new model from scratch,
+delete the checkpoint directory or specify a different
+--checkpoint_dir argument.
+============
+
+""")
+        else:
+            print("""
+
+============
+An existing model was not found in the checkpoint directory.
+Initializing a new one.
+============
+
+""")
+
+        for epoch in xrange(config.epoch):
+            image_data = glob(os.path.join(config.dataset, "*.png"))
+            batch_idxs = min(len(image_data), config.train_size) // self.batch_size
+
+            for idx in xrange(0, batch_idxs):
+                
+                #++++++++ data loading ++++++++#
+                
+                data_start_time = time.time()
+                batch_files = image_data[idx*config.batch_size:(idx+1)*config.batch_size]
+                batch = [get_image(batch_file, self.image_size, is_crop=self.is_crop)
+                         for batch_file in batch_files]
+                batch_images = np.array(batch).astype(np.float32)
+
+                batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
+                            .astype(np.float32)
+
+                batch_t_ = [get_text_batch(os.path.basename(batch_file), text_data)
+                         for batch_file in batch_files]
+                batch_t = np.array(batch_t_).astype(np.float32)
+
+                ######### for face attributes #########
+                # randomly generated wrong face attributes
+                batch_t_wr_ = [np.random.choice(np.arange(2), size=config.batch_size, 
+                                                p=[1-attr_percent[i], attr_percent[i]]) * 2 - 1 
+                               for i in xrange(self.text_vector_dim)]
+                batch_t_wr = np.transpose(batch_t_wr_).astype(np.float32)
+                ######### for face attributes #########
+                
+                '''
+                # randomly select wrong images
+                idx_wr = np.random.randint(batch_idxs)
+                while (idx_wr == idx):
+                    idx_wr = np.random.randint(batch_idxs)
+
+                batch_files_wr = image_data[idx_wr*config.batch_size:(idx_wr+1)*config.batch_size]
+                batch_wr = [get_image(batch_file_wr, self.image_size, is_crop=self.is_crop)
+                         for batch_file_wr in batch_files_wr]
+                batch_images_wr = np.array(batch_wr).astype(np.float32)
+                '''
+                data_time = time.time() - data_start_time
+
+                #-------- data loading --------#
+
+                
+                #++++++++ training ++++++++#
+                
+                # Update D network
+                _, summary_str = self.sess.run([d_optim, self.d_sum],
+                    feed_dict={ self.images: batch_images, self.z: batch_z, self.t: batch_t, self.t_wr: batch_t_wr })
+                self.writer.add_summary(summary_str, counter)
+
+                # Update G network
+                _, summary_str = self.sess.run([g_optim, self.g_sum],
+                    feed_dict={ self.z: batch_z, self.t: batch_t })
+                self.writer.add_summary(summary_str, counter)
+
+                # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
+                _, summary_str = self.sess.run([g_optim, self.g_sum],
+                    feed_dict={ self.z: batch_z, self.t: batch_t })
+                self.writer.add_summary(summary_str, counter)
+                
+                errD_fake = self.d_loss_fake.eval({self.z: batch_z, self.t: batch_t})
+                errD_real = self.d_loss_real.eval({self.images: batch_images, self.t: batch_t})
+                errG = self.g_loss.eval({self.z: batch_z, self.t: batch_t})
+                #-------- training --------#
+
+                counter += 1
+                print("Epoch: [%2d] [%4d/%4d] data_time: %4.4f, time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
+                    % (epoch, idx, batch_idxs, data_time,
+                        time.time() - start_time, errD_fake+errD_real, errG))
+                
+                if np.mod(counter, self.sample_freq) == 1:
+                    samples = self.sess.run(
+                        [self.sampler], feed_dict={self.z: sample_z, self.t: sample_t})
+                    save_images(samples[0], [nRows, nCols],
+                                os.path.join(self.sample_dir, 'train_{:02d}_{:04d}.png'.format(epoch, idx)))
+                    #print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss))
+
+                if np.mod(counter, self.save_freq) == 2:
+                    self.save(config.checkpoint_dir, counter)
+
+
+    def test(self, config):
+        tf.initialize_all_variables().run()
+
+        isLoaded = self.load(self.checkpoint_dir)
+        assert(isLoaded)
+
+        # image_data = glob(os.path.join(config.dataset, "*.png"))
+        nImgs = len(config.imgs)
+
+        batch_idxs = int(np.ceil(nImgs/self.batch_size))
+        if config.maskType == 'right':
+            mask = np.ones(self.image_shape)
+            mask[:,self.image_size:,:] = 0.0
+        elif config.maskType == 'left':
+            mask = np.ones(self.image_shape)
+            mask[:,:self.image_size,:] = 0.0
+        else:
+            assert(False)
+            
+        text_data = pickle.load(open(config.text_path, 'rb'))
+
+        num_batch = int(np.ceil(nImgs/self.batch_size))
+        for idx in xrange(0, num_batch):
+            print('batch no. ' + str(idx+1) + ':\n')
+            
+            l = idx*self.batch_size
+            u = min((idx+1)*self.batch_size, nImgs)
+            batchSz = u-l
+            batch_files = config.imgs[l:u]
+            batch = [get_image(batch_file, self.image_size, is_crop=self.is_crop)
+                     for batch_file in batch_files]
+            batch_images = np.array(batch).astype(np.float32)
+            batch_mask = np.resize(mask, [self.batch_size] + self.image_shape)
+            
+            os.makedirs(os.path.join(config.outDir, 'hats_imgs_{:04d}'.format(idx)))
+            os.makedirs(os.path.join(config.outDir, 'completed_{:04d}'.format(idx)))
+            
+            #++++++++ for face attributes ++++++++#
+            
+            # attributes to be loaded
+            if (config.attributes[0] == None):
+                batch_t_ = [get_text_batch(os.path.basename(batch_file), text_data)
+                        for batch_file in batch_files]
+                batch_t = np.array(batch_t_).astype(np.float32)
+                
+            # user_defiened attributes
+            else:
+                attr_v = config.attributes
+                assert(len(attr_v) == self.text_vector_dim, "attribute vector must have the given length")
+                print('using attributes: ', attr_v)
+                batch_t = np.array([attr_v,]*batchSz).astype(np.float32)
+                
+            with open(os.path.join(config.outDir, 'completed_{:04d}/texts.txt'.format(idx)), 'wb') as f:
+                np.savetxt(f, batch_t, fmt='%i', delimiter='\t')
+                
+            #-------- for face attributes --------#
+            
+            # last batch
+            if batchSz < self.batch_size:
+                print(batchSz)
+                padSz = ((0, int(self.batch_size-batchSz)), (0,0), (0,0), (0,0))
+                batch_images = np.pad(batch_images, padSz, 'wrap')
+                batch_images = batch_images.astype(np.float32)
+                batch_t = np.pad(batch_t, ((0, int(self.batch_size-batchSz)), (0,0)), 'wrap')
+            
+            
+            nRows = np.ceil(batchSz/8)
+            nCols = min(8, batchSz) #8
+            
+            
+            #++++++++ z initialization ++++++++#
+            
+            zhats_init = np.random.uniform(-1, 1, size=(self.batch_size, self.z_dim)).astype(np.float32)
+            zhats_ = zhats_init.copy()
+            kl_div = np.full(len(zhats_), np.inf)
+            in_flat = [rgb2gray(img[:,:self.image_size,:]).flatten() for img in batch_images]
+            in_flat = np.array(in_flat) + 1
+            kld_avg = 0
+            
+            kld_f = open(os.path.join(config.outDir, 'hats_imgs_{:04d}/kld_init.txt'.format(idx)), 'w')
+            kld_f.write('average kl divergence of initializations:')
+            for i in xrange(30):
+                G_imgs = self.sess.run([self.G], feed_dict={ self.z: zhats_, self.t: batch_t })
+                save_images(G_imgs[0][:batchSz,:,:,:], [nRows, nCols],
+                        os.path.join(config.outDir, 'hats_imgs_{:04d}/init_{:02d}.png'.format(idx, i)))
+                
+                out_flat = [rgb2gray(img[:,:self.image_size,:]).flatten() for img in G_imgs[0]]
+                out_flat = np.array(out_flat) + 1
+                
+                # choose lowest kl divergence
+                for j in xrange(self.batch_size):
+                    kl_d = entropy(in_flat[j], out_flat[j])
+                    if (kl_d < kl_div[j]):
+                        zhats_init[j] = zhats_[j]
+                        kl_div[j] = kl_d
+                
+                kld_avg = kl_div.mean()
+                print('average KL divergence:', kld_avg)
+                kld_f.write('{:02d}: {:04.4f}'.format(i, kld_avg))
+                
+                zhats_ = np.random.uniform(-1, 1, size=(self.batch_size, self.z_dim)).astype(np.float32)
+            
+            print('choosing min KL divergence:', kld_avg)
+            kld_f.write('choosing min KL divergence: {:04.4f}'.format(kld_avg))
+            kld_f.close()
+            
+            G_imgs = self.sess.run([self.G], feed_dict={ self.z: zhats_init, self.t: batch_t })
+            save_images(G_imgs[0][:batchSz,:,:,:], [nRows, nCols],
+                        os.path.join(config.outDir, 'hats_imgs_{:04d}/chosen_init.png'.format(idx)))
+            
+            #-------- z initialization --------#
+            
+            
+            #++++++++ completion ++++++++#
+            
+            zhats = zhats_init.copy().astype(np.float32)
+            v = 0
+
+            save_images(batch_images[:batchSz,:,:,:], [nRows,nCols],
+                        os.path.join(config.outDir, 'hats_imgs_{:04d}/gt.png'.format(idx)))
+            masked_images = np.multiply(batch_images, batch_mask)
+            save_images(masked_images[:batchSz,:,:,:], [nRows,nCols],
+                        os.path.join(config.outDir, 'hats_imgs_{:04d}/masked.png'.format(idx)))
+            
+            for i in xrange(config.nIter):
+                fd = {
+                    self.z: zhats,
+                    self.mask: batch_mask,
+                    self.images: batch_images,
+                    self.t: batch_t,
+                }
+                run = [self.complete_loss, self.grad_complete_loss, self.G]
+                loss, g, G_imgs = self.sess.run(run, feed_dict=fd)
+
+                # update zhats
+                v_prev = np.copy(v)
+                v = config.momentum*v - config.lr*g[0]
+                zhats += -config.momentum * v_prev + (1+config.momentum)*v
+                zhats = np.clip(zhats, -1, 1)
+
+                # save images
+                if i % 20 == 0:
+                    print(i, np.mean(loss[0:batchSz]))
+                    imgName = os.path.join(config.outDir,
+                                           'hats_imgs_{:04d}/{:04d}.png'.format(idx, i))
+                    save_images(G_imgs[:batchSz,:,:,:], [nRows,nCols], imgName)
+
+                    inv_masked_hat_images = np.multiply(G_imgs, 1.0-batch_mask)
+                    completed = masked_images + inv_masked_hat_images
+                    imgName = os.path.join(config.outDir,
+                                           'completed_{:04d}/{:04d}.png'.format(idx, i))
+                    save_images(completed[:batchSz,:,:,:], [nRows,nCols], imgName)
+                    
+            #-------- completion --------#
+
+
+            #++++++++ interpolation visualization ++++++++#
+            
+            zhats_final = np.copy(zhats)
+            diff = zhats_final - zhats_init
+            step = 5
+            for i in xrange(step):
+                z_ = zhats_init + diff / (step-1) * i
+                G_imgs = self.sess.run([self.G], feed_dict={ self.z: z_, self.t: batch_t })
+                imgName = os.path.join(config.outDir, 'hats_imgs_{:04d}/{:01d}_interp.png'.format(idx, i))
+                save_images(G_imgs[0][:batchSz,:,:,:], [nRows,nCols], imgName)
+                
+            #-------- interpolation visualization --------#
+                
+                    
+    def discriminator(self, image, t, reuse=False):
+        if reuse:
+            tf.get_variable_scope().reuse_variables()
+
+        h0 = lrelu(conv2d(image, self.df_dim, name='d_h0_conv'))
+        
+        t_ = tf.expand_dims(t, 1)
+        t_ = tf.expand_dims(t_, 2)
+        t_tiled = tf.tile(t_, [1,32,64,1], name='tiled_t')
+        h0_concat = tf.concat(3, [h0, t_tiled], name='h0_concat')
+        
+        h1 = lrelu(self.d_bn1(conv2d(h0_concat, self.df_dim*2, name='d_h1_conv')))
+        h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, name='d_h2_conv')))
+        h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, name='d_h3_conv')))
+
+        #h4 = linear(tf.reshape(h3, [-1, 8192*2]), 1, 'd_h3_lin')
+        # conv to 512x1x1
+        h4 = conv2d(h3, self.df_dim*8, 4, 8, 1, 1, name='d_h4_conv')
+
+        return tf.nn.sigmoid(h4), h4
+
+    
+    def generator(self, z, t):
+        
+        self.z_, self.h0_lin_w, self.h0_lin_b = linear(z, self.gf_dim*4*8, 'g_h0_lin', with_w=True)
+        z_ = tf.reshape(self.z_, [-1, 4, 8, self.gf_dim])
+        
+        t_ = tf.expand_dims(tf.expand_dims(t, 1), 2)
+        t_tiled = tf.tile(t_, [1,4,8,1])
+        
+        h0_concat = tf.concat(3, [z_, t_tiled])
+        
+        self.h0, self.h0_w, self.h0_b = conv2d_transpose(h0_concat,
+            [self.batch_size, 4, 8, self.gf_dim*8], 1, 1, 1, 1, name='g_h0', with_w=True)
+        h0 = tf.nn.relu(self.g_bn0(self.h0))
+        
+        self.h1, self.h1_w, self.h1_b = conv2d_transpose(h0,
+            [self.batch_size, 8, 16, self.gf_dim*4], name='g_h1', with_w=True)
+        h1 = tf.nn.relu(self.g_bn1(self.h1))
+
+        h2, self.h2_w, self.h2_b = conv2d_transpose(h1,
+            [self.batch_size, 16, 32, self.gf_dim*2], name='g_h2', with_w=True)
+        h2 = tf.nn.relu(self.g_bn2(h2))
+
+        h3, self.h3_w, self.h3_b = conv2d_transpose(h2,
+            [self.batch_size, 32, 64, self.gf_dim*1], name='g_h3', with_w=True)
+        h3 = tf.nn.relu(self.g_bn3(h3))
+
+        h4, self.h4_w, self.h4_b = conv2d_transpose(h3,
+            [self.batch_size, 64, 128, 3], name='g_h4', with_w=True)
+
+        return tf.nn.tanh(h4)
+
+    
+    def sampler(self, z, t, y=None):
+        tf.get_variable_scope().reuse_variables()
+
+        z_ = tf.reshape(linear(z, self.gf_dim*4*8, 'g_h0_lin'), [-1, 4, 8, self.gf_dim])
+        
+        t_ = tf.expand_dims(tf.expand_dims(t, 1), 2)
+        t_tiled = tf.tile(t_, [1,4,8,1])
+        
+        h0_concat = tf.concat(3, [z_, t_tiled])
+        
+        h0 = conv2d_transpose(h0_concat, 
+            [self.batch_size, 4, 8, self.gf_dim*8], 1, 1, 1, 1, name='g_h0')
+        h0 = tf.nn.relu(self.g_bn0(h0, train=False))
+
+        h1 = conv2d_transpose(h0, [self.batch_size, 8, 16, self.gf_dim*4], name='g_h1')
+        h1 = tf.nn.relu(self.g_bn1(h1, train=False))
+
+        h2 = conv2d_transpose(h1, [self.batch_size, 16, 32, self.gf_dim*2], name='g_h2')
+        h2 = tf.nn.relu(self.g_bn2(h2, train=False))
+
+        h3 = conv2d_transpose(h2, [self.batch_size, 32, 64, self.gf_dim*1], name='g_h3')
+        h3 = tf.nn.relu(self.g_bn3(h3, train=False))
+
+        h4 = conv2d_transpose(h3, [self.batch_size, 64, 128, 3], name='g_h4')
+
+        return tf.nn.tanh(h4)
+
+
+    def save(self, checkpoint_dir, step):
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
+
+        self.saver.save(self.sess,
+                        os.path.join(checkpoint_dir, self.model_name),
+                        global_step=step)
+
+        
+    def load(self, checkpoint_dir):
+        print(" [*] Reading checkpoints...")
+
+        ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+            return True
+        else:
+            return False
