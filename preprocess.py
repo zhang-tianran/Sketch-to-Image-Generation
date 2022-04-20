@@ -1,4 +1,71 @@
-import glob
-import random
-import os
 import numpy as np
+import tensorflow as tf
+import os
+import glob
+import cv2
+
+
+def get_images_paths(directory_name, image_type):
+    """
+    get the file name/path of all the files within a folder.
+        e.g. glob.glob("/home/adam/*/*.txt").
+    Use glob.escape to escape strings that are not meant to be patterns
+        glob.glob(glob.escape(directory_name) + "/*.txt")
+
+    :param directory_name: (str) the root directory name that contains all the images we want
+    :param image: (str) either "jpg" or "png"
+    :return: a list of queried files and directories
+    """
+    # concatnate strings
+    end = "/*." + image_type
+
+    return glob.glob(glob.escape(directory_name) + end)
+
+
+def resize(img):
+    '''
+    resize test images to COCO img dims
+
+    Inputs:
+    - img: RGB image
+
+    Returns:
+    - resized image [640, 480, 3]
+    '''
+    pass
+
+
+def image_to_sketch(img, kernel_size=10, greyscale=False):
+    """
+    Inputs:
+    - img: RGB image, ndarray of shape []
+    - kernel_size: 10 by default, used in DoG processing
+    - greyscale: False by default, convert to greyscale image if True, RGB otherwise
+
+    Returns: 
+    - RGB or greyscale sketch, ndarray of shape [] or []
+    """
+    # convert to greyscale
+    grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # invert
+    inv = cv2.bitwise_not(grey)
+    # blur
+    blur = cv2.GaussianBlur(inv, (kernel_size, kernel_size), 0)
+    # invert
+    inv_blur = cv2.bitwise_not(blur)
+    # convert to sketch
+    sketch = cv2.divide(grey, inv_blur, scale=256.0)
+
+    if greyscale:
+        return cv2.cvtColor(sketch, cv2.COLOR_BGR2GRAY)
+    else:
+        return sketch
+
+
+
+def visualize(img):
+    cv2.imwrite('sketch.png', img)
+    cv2.imshow('sketch image',img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
