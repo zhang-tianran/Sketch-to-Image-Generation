@@ -1,162 +1,121 @@
-# Reference: https://github.com/eriklindernoren/PyTorch-GAN/tree/master/implementations/ccgan
+# Reference: https://github.com/eriklindernoren/Keras-GAN/blob/master/context_encoder/context_encoder.py
 
 import argparse
-import os
 import numpy as np
-import math
-
-import torchvision.transforms as transforms
-from torchvision.utils import save_image
-from PIL import Image
-
-from torch.utils.data import DataLoader
-from torchvision import datasets
-from torch.autograd import Variable
 
 from models import *
 from evaluation import *
 from preprocess import *
 
-import torch.nn as nn
-import torch.nn.functional as F
-import torch
-
-os.makedirs("images", exist_ok=True)
-
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=8, help="size of the batches")
-parser.add_argument("--dataset_name", type=str, default="img_align_celeba", help="name of the dataset")
-parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
-parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--b2", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
-parser.add_argument("--img_size", type=int, default=128, help="size of each image dimension")
-parser.add_argument("--mask_size", type=int, default=32, help="size of random mask")
-parser.add_argument("--channels", type=int, default=3, help="number of image channels")
-parser.add_argument("--sample_interval", type=int, default=500, help="interval between image sampling")
+parser.add_argument("--epochs", type=int, default=30000, help="number of epochs of training")
+parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
+parser.add_argument("--sample_interval", type=int, default=50, help="interval between image sampling")
 opt = parser.parse_args()
 print(opt)
 
-input_shape = (opt.channels, opt.img_size, opt.img_size)
+def train(model, X_train):
 
-# Loss function
-# TODO
-adversarial_loss = torch.nn.MSELoss()
+    # Adversarial ground truths
+    valid = np.ones((opt.batch_size, 1))
+    fake = np.zeros((opt.batch_size, 1))
 
-# Initialize generator and discriminator
-generator = Generator(input_shape)
-discriminator = Discriminator(input_shape)
-
-# Initialize weights
-generator.apply(weights_init_normal)
-discriminator.apply(weights_init_normal)
-
-# Dataset loader
-# TODO call preprocess
-transforms_ = [
-    transforms.Resize((opt.img_size, opt.img_size), Image.BICUBIC),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-]
-dataloader = DataLoader(
-    ImageDataset("../../data/%s" % opt.dataset_name, transforms_x=transforms_),
-    batch_size=opt.batch_size,
-    shuffle=True,
-)
-
-# Optimizers
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
-optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
-
-# Used to generate ideal labels
-Tensor = torch.FloatTensor
-
-def apply_random_mask(imgs):
-    idx = np.random.randint(0, opt.img_size - opt.mask_size, (imgs.shape[0], 2))
-
-    masked_imgs = imgs.clone()
-    for i, (y1, x1) in enumerate(idx):
-        y2, x2 = y1 + opt.mask_size, x1 + opt.mask_size
-        masked_imgs[i, :, y1:y2, x1:x2] = -1
-
-    return masked_imgs
-
-
-def save_sample(saved_samples):
-    # Generate inpainted image
-    gen_imgs = generator(saved_samples["masked"], saved_samples["lowres"])
-    # Save sample
-    sample = torch.cat((saved_samples["masked"].data, gen_imgs.data, saved_samples["imgs"].data), -2)
-    save_image(sample, "images/%d.png" % batches_done, nrow=5, normalize=True)
-
-def train(dataloader, epoch):
-    for i, batch in enumerate(dataloader):
-        imgs = batch["x"]
-
-        masked_imgs = apply_random_mask(imgs)
-
-        # Adversarial ground truths
-        valid = Variable(Tensor(imgs.shape[0], *discriminator.output_shape).fill_(1.0), requires_grad=False)
-        fake = Variable(Tensor(imgs.shape[0], *discriminator.output_shape).fill_(0.0), requires_grad=False)
-
-        real_imgs = Variable(imgs)
-        masked_imgs = Variable(masked_imgs)
-
-        # -----------------
-        #  Train Generator
-        # -----------------
-
-        optimizer_G.zero_grad()
-
-        # Generate a batch of images
-        gen_imgs = generator(masked_imgs)
-
-        # Loss measures generator's ability to fool the discriminator
-        # TODO
-        g_loss = adversarial_loss(discriminator(gen_imgs), valid)
-
-        g_loss.backward()
-        optimizer_G.step()
+    for epoch in range(opt.epochs):
 
         # ---------------------
         #  Train Discriminator
         # ---------------------
 
-        optimizer_D.zero_grad()
+        # Select a random batch of images
+        idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
+        imgs = X_train[idx]
 
-        # Measure discriminator's ability to classify real from generated samples
-        # TODO
-        real_loss = adversarial_loss(discriminator(real_imgs), valid)
-        fake_loss = adversarial_loss(discriminator(gen_imgs.detach()), fake)
-        d_loss = 0.5 * (real_loss + fake_loss)
+        masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
 
-        d_loss.backward()
-        optimizer_D.step()
+        # Generate a batch of new images
+        gen_missing = model.generator.predict(masked_imgs)
 
-        print(
-            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-            % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item())
-        )
+        # Train the discriminator
+        d_loss_real = model.discriminator.train_on_batch(missing_parts, valid)
+        d_loss_fake = model.discriminator.train_on_batch(gen_missing, fake)
+        d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
-        # Save first ten samples
-        if not saved_samples:
-            saved_samples["imgs"] = real_imgs[:1].clone()
-            saved_samples["masked"] = masked_imgs[:1].clone()
-            # saved_samples["lowres"] = imgs_lr[:1].clone()
-        elif saved_samples["imgs"].size(0) < 10:
-            saved_samples["imgs"] = torch.cat((saved_samples["imgs"], real_imgs[:1]), 0)
-            saved_samples["masked"] = torch.cat((saved_samples["masked"], masked_imgs[:1]), 0)
-            # saved_samples["lowres"] = torch.cat((saved_samples["lowres"], imgs_lr[:1]), 0)
+        # ---------------------
+        #  Train Generator
+        # ---------------------
 
-        batches_done = epoch * len(dataloader) + i
-        if batches_done % opt.sample_interval == 0:
-            save_sample(saved_samples)
+        g_loss = model.combined.train_on_batch(masked_imgs, [missing_parts, valid])
 
+        # Plot the progress
+        print ("%d [D loss: %f, acc: %.2f%%] [G loss: %f, mse: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss[0], g_loss[1]))
+
+        # If at save interval => save generated image samples
+        if epoch % opt.sample_interval == 0:
+            idx = np.random.randint(0, X_train.shape[0], 6)
+            imgs = X_train[idx]
+            sample_images(model, epoch, imgs)
 
 
-saved_samples = {}
-for epoch in range(opt.n_epochs):
-    train(dataloader, epoch)
+def mask_randomly(self, imgs):
+    y1 = np.random.randint(0, self.img_rows - self.mask_height, imgs.shape[0])
+    y2 = y1 + self.mask_height
+    x1 = np.random.randint(0, self.img_rows - self.mask_width, imgs.shape[0])
+    x2 = x1 + self.mask_width
+
+    masked_imgs = np.empty_like(imgs)
+    missing_parts = np.empty((imgs.shape[0], self.mask_height, self.mask_width, self.channels))
+    for i, img in enumerate(imgs):
+        masked_img = img.copy()
+        _y1, _y2, _x1, _x2 = y1[i], y2[i], x1[i], x2[i]
+        missing_parts[i] = masked_img[_y1:_y2, _x1:_x2, :].copy()
+        masked_img[_y1:_y2, _x1:_x2, :] = 0
+        masked_imgs[i] = masked_img
+
+    return masked_imgs, missing_parts, (y1, y2, x1, x2)
+
+def sample_images(model, epoch, imgs):
+    r, c = 3, 6
+
+    masked_imgs, missing_parts, (y1, y2, x1, x2) = mask_randomly(imgs)
+    gen_missing = model.generator.predict(masked_imgs)
+
+    imgs = 0.5 * imgs + 0.5
+    masked_imgs = 0.5 * masked_imgs + 0.5
+    gen_missing = 0.5 * gen_missing + 0.5
+
+    fig, axs = plt.subplots(r, c)
+    for i in range(c):
+        axs[0,i].imshow(imgs[i, :,:])
+        axs[0,i].axis('off')
+        axs[1,i].imshow(masked_imgs[i, :,:])
+        axs[1,i].axis('off')
+        filled_in = imgs[i].copy()
+        filled_in[y1[i]:y2[i], x1[i]:x2[i], :] = gen_missing[i]
+        axs[2,i].imshow(filled_in)
+        axs[2,i].axis('off')
+    fig.savefig("images/%d.png" % epoch)
+    plt.close()
+
+def save_model(model):
+
+    def save(model, model_name):
+        model_path = "saved_model/%s.json" % model_name
+        weights_path = "saved_model/%s_weights.hdf5" % model_name
+        options = {"file_arch": model_path,
+                    "file_weight": weights_path}
+        json_string = model.to_json()
+        open(options['file_arch'], 'w').write(json_string)
+        model.save_weights(options['file_weight'])
+
+    save(model.generator, "generator")
+    save(model.discriminator, "discriminator")
+
+
+if __name__ == '__main__':
+    model = ContextualGAN()
     eval = evaluation()
-    
+    # TODO Import data from preprocess
+    train_input, train_labels, test_input, test_labels = None
+    train(model, train_input)
+    print(eval.test(model, test_input, test_labels))
+    save_model(model)
