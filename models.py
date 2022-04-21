@@ -51,10 +51,10 @@ class ContextualGAN():
             
             return kl(y_pred, y_true)
 
-        def total_loss(y_true, y_pred):
-            p_loss = K.binary_crossentropy(y_true, y_pred)
-            c_loss = contextual_loss(y_true, y_pred)
-            return opt.lam1 * p_loss + opt.lam2 * c_loss
+        # def total_loss(y_true, y_pred):
+        #     p_loss = K.binary_crossentropy(y_true, y_pred)
+        #     c_loss = contextual_loss(y_true, y_pred)
+        #     return opt.lam1 * p_loss + opt.lam2 * c_loss
 
         # Build and compile the discriminator
         self.discriminator = self.build_discriminator()
@@ -80,8 +80,8 @@ class ContextualGAN():
         # The combined model  (stacked generator and discriminator)
         # Trains generator to fool discriminator
         self.combined = Model(masked_img , [gen_missing, valid])
-        self.combined.compile(loss=[total_loss, 'binary_crossentropy'],
-            loss_weights=[0.999, 0.001],
+        self.combined.compile(loss=['binary_crossentropy', contextual_loss],
+            loss_weights=[opt.lam1, opt.lam2],
             optimizer=optimizer)
 
     def build_generator(self):
