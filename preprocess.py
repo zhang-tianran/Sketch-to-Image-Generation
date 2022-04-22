@@ -38,11 +38,11 @@ def resize(img):
     pass
 
 
-def image_to_sketch(img, kernel_size=10, greyscale=False):
+def image_to_sketch(img, kernel_size=7, greyscale=False):
     """
     Inputs:
     - img: RGB image, ndarray of shape []
-    - kernel_size: 10 by default, used in DoG processing
+    - kernel_size: 7 by default, used in DoG processing
     - greyscale: False by default, convert to greyscale image if True, RGB otherwise
 
     Returns:
@@ -89,41 +89,65 @@ def extract_classwise_instances(samples, output_dir, label_field, ext=".png"):
             alpha = np.expand_dims(alpha, 2)
             mask_img = np.concatenate((mask_img, alpha), axis=2)
 
+            # TODO: filter image by size, drop small ones
+
             label = det.label
             label_dir = os.path.join(output_dir, label)
+
+
+
             if not os.path.exists(label_dir):
                 os.mkdir(label_dir)
             output_filepath = os.path.join(label_dir, det.id+ext)
             cv2.imwrite(output_filepath, mask_img)
 
+def convert_dir_to_sketch(dir_path, save_dir):
+    files = get_images_paths(dir_path, "png")
+    i=0
+    for f in files:
+        ext = str(i)+".png"
+        img = cv2.imread(f)
+        sketch = image_to_sketch(img)
+        cv2.imwrite(os.path.join(save_dir,ext), sketch)
+        i +=1
+
+    # TODO: pad original img
+    # TODO: concat img with sketch
+
+
+
 
 
 def main():
     #testting whether the code works on the people's dataset
-    dataset_name = "coco-image-example"
-    if dataset_name in fo.list_datasets():
-        fo.delete_dataset(dataset_name)
+    # dataset_name = "coco-image-example"
+    # if dataset_name in fo.list_datasets():
+    #     fo.delete_dataset(dataset_name)
+    #
+    # label_field = "ground_truth"
+    # classes = ["dog","umbrella","truck"]
+    #
+    # dataset = foz.load_zoo_dataset(
+    #     "coco-2017",
+    #     split="validation",
+    #     label_types=["segmentations"],
+    #     classes=classes,
+    #     max_samples=100,
+    #     label_field=label_field,
+    #     dataset_name=dataset_name,
+    # )
+    #
+    # view = dataset.filter_labels(label_field, F("label").is_in(classes))
 
-    label_field = "ground_truth"
-    classes = ["zebra","dog","umbrella","truck"]
+    # output_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data" #change to your desired file path
+    # print("called")
+    # os.makedirs(output_dir,exist_ok=True)
+    #
+    # extract_classwise_instances(view, output_dir, label_field)
 
-    dataset = foz.load_zoo_dataset(
-        "coco-2017",
-        split="validation",
-        label_types=["segmentations"],
-        classes=classes,
-        max_samples=100,
-        label_field=label_field,
-        dataset_name=dataset_name,
-    )
-
-    view = dataset.filter_labels(label_field, F("label").is_in(classes))
-
-    output_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data" #change to your desired file path
-    print("called")
-    os.makedirs(output_dir,exist_ok=True)
-
-    extract_classwise_instances(view, output_dir, label_field)
+    sketch_out_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog_sketch"
+    os.makedirs(sketch_out_dir,exist_ok=True)
+    convert_dir_to_sketch("/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog",sketch_out_dir)
 
 if __name__ == '__main__':
     main()
