@@ -45,7 +45,7 @@ def image_to_sketch(img, kernel_size=10, greyscale=False):
     - kernel_size: 10 by default, used in DoG processing
     - greyscale: False by default, convert to greyscale image if True, RGB otherwise
 
-    Returns: 
+    Returns:
     - RGB or greyscale sketch, ndarray of shape [] or []
     """
     # convert to greyscale
@@ -84,11 +84,11 @@ def extract_classwise_instances(samples, output_dir, label_field, ext=".png"):
             x = int(x * img_w)
             y = int(y * img_h)
             h, w = mask.shape
-            mask_img = img[y:y+h, x:x+w, :] 
+            mask_img = img[y:y+h, x:x+w, :]
             alpha = mask.astype(np.uint8)*255
             alpha = np.expand_dims(alpha, 2)
             mask_img = np.concatenate((mask_img, alpha), axis=2)
-    
+
             label = det.label
             label_dir = os.path.join(output_dir, label)
             if not os.path.exists(label_dir):
@@ -105,27 +105,25 @@ def main():
         fo.delete_dataset(dataset_name)
 
     label_field = "ground_truth"
-    classes = ["person"]
+    classes = ["zebra","dog","umbrella","truck"]
 
     dataset = foz.load_zoo_dataset(
         "coco-2017",
         split="validation",
         label_types=["segmentations"],
         classes=classes,
-        max_samples=20,
+        max_samples=100,
         label_field=label_field,
         dataset_name=dataset_name,
     )
 
     view = dataset.filter_labels(label_field, F("label").is_in(classes))
 
-    output_dir = "/Users/nealyin/Desktop/data" #change to your desired file path
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data" #change to your desired file path
+    print("called")
+    os.makedirs(output_dir,exist_ok=True)
 
     extract_classwise_instances(view, output_dir, label_field)
 
 if __name__ == '__main__':
     main()
-
-
-
