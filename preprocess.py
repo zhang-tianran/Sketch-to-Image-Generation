@@ -3,6 +3,9 @@ import tensorflow as tf
 import os
 import glob
 import cv2
+import fiftyone as fo
+import fiftyone.zoo as foz
+from fiftyone import ViewField as F
 
 
 def get_images_paths(directory_name, image_type):
@@ -68,4 +71,61 @@ def visualize(img):
     cv2.imshow('sketch image',img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def extract_classwise_instances(samples, output_dir, label_field, ext=".png"):
+    print("Extracting object instances...")
+    for sample in samples.iter_samples(progress=True):
+        img = cv2.imread(sample.filepath)
+        img_h,img_w,c = img.shape
+        for det in sample[label_field].detections:
+            mask = det.mask
+            [x,y,w,h] = det.bounding_box
+            x = int(x * img_w)
+            y = int(y * img_h)
+            h, w = mask.shape
+            mask_img = img[y:y+h, x:x+w, :] 
+            alpha = mask.astype(np.uint8)*255
+            alpha = np.expand_dims(alpha, 2)
+            mask_img = np.concatenate((mask_img, alpha), axis=2)
+    
+            label = det.label
+            label_dir = os.path.join(output_dir, label)
+            if not os.path.exists(label_dir):
+                os.mkdir(label_dir)
+            output_filepath = os.path.join(label_dir, det.id+ext)
+            cv2.imwrite(output_filepath, mask_img)
+
+
+
+def main():
+    #testting whether the code works on the people's dataset
+    dataset_name = "coco-image-example"
+    if dataset_name in fo.list_datasets():
+        fo.delete_dataset(dataset_name)
+
+    label_field = "ground_truth"
+    classes = ["person"]
+
+    dataset = foz.load_zoo_dataset(
+        "coco-2017",
+        split="validation",
+        label_types=["segmentations"],
+        classes=classes,
+        max_samples=20,
+        label_field=label_field,
+        dataset_name=dataset_name,
+    )
+
+    view = dataset.filter_labels(label_field, F("label").is_in(classes))
+
+    output_dir = "/Users/nealyin/Desktop/data" #change to your desired file path
+    os.makedirs(output_dir, exist_ok=True)
+
+    extract_classwise_instances(view, output_dir, label_field)
+
+if __name__ == '__main__':
+    main()
+
+
 
