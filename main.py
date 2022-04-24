@@ -30,7 +30,8 @@ def train(model, X_train):
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
         imgs = X_train[idx]
 
-        masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
+        # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
+        masked_imgs = model.mask_image(imgs)
 
         # Generate a batch of new images
         gen_missing = model.generator.predict(masked_imgs)
@@ -56,27 +57,34 @@ def train(model, X_train):
             sample_images(model, epoch, imgs)
 
 
-def mask_randomly(self, imgs):
-    y1 = np.random.randint(0, self.img_rows - self.mask_height, imgs.shape[0])
-    y2 = y1 + self.mask_height
-    x1 = np.random.randint(0, self.img_rows - self.mask_width, imgs.shape[0])
-    x2 = x1 + self.mask_width
+# def mask_randomly(self, imgs):
+#     y1 = np.random.randint(0, self.img_rows - self.mask_height, imgs.shape[0])
+#     y2 = y1 + self.mask_height
+#     x1 = np.random.randint(0, self.img_rows - self.mask_width, imgs.shape[0])
+#     x2 = x1 + self.mask_width
 
-    masked_imgs = np.empty_like(imgs)
-    missing_parts = np.empty((imgs.shape[0], self.mask_height, self.mask_width, self.channels))
-    for i, img in enumerate(imgs):
-        masked_img = img.copy()
-        _y1, _y2, _x1, _x2 = y1[i], y2[i], x1[i], x2[i]
-        missing_parts[i] = masked_img[_y1:_y2, _x1:_x2, :].copy()
-        masked_img[_y1:_y2, _x1:_x2, :] = 0
-        masked_imgs[i] = masked_img
+#     masked_imgs = np.empty_like(imgs)
+#     missing_parts = np.empty((imgs.shape[0], self.mask_height, self.mask_width, self.channels))
+#     for i, img in enumerate(imgs):
+#         masked_img = img.copy()
+#         _y1, _y2, _x1, _x2 = y1[i], y2[i], x1[i], x2[i]
+#         missing_parts[i] = masked_img[_y1:_y2, _x1:_x2, :].copy()
+#         masked_img[_y1:_y2, _x1:_x2, :] = 0
+#         masked_imgs[i] = masked_img
 
-    return masked_imgs, missing_parts, (y1, y2, x1, x2)
+#     return masked_imgs, missing_parts, (y1, y2, x1, x2)
+def mask_image(self, imgs):
+    shape = imgs[0].shape
+    mask = np.ones(shape)   #the shape of the images
+    mask[:,shape:,:] = 0.0 
+
+    return mask
 
 def sample_images(model, epoch, imgs):
     r, c = 3, 6
 
-    masked_imgs, missing_parts, (y1, y2, x1, x2) = mask_randomly(imgs)
+    # masked_imgs, missing_parts, (y1, y2, x1, x2) = mask_image(imgs)
+    masked_imgs = mask_image(imgs)
     gen_missing = model.generator.predict(masked_imgs)
 
     imgs = 0.5 * imgs + 0.5
