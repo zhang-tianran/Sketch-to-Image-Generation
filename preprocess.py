@@ -1,6 +1,3 @@
-from inspect import istraceback
-from winreg import HKEY_CURRENT_USER
-from cv2 import hconcat
 import numpy as np
 import tensorflow as tf
 import os
@@ -11,7 +8,7 @@ import fiftyone.zoo as foz
 from fiftyone import ViewField as F
 
 
-def get_images_paths(directory_name, image_type):
+def get_images_paths(directory_name, image_type='png'):
     """
     get the file name/path of all the files within a folder.
         e.g. glob.glob("/home/adam/*/*.txt").
@@ -55,20 +52,20 @@ def store_source_img(store_dir, size_lower_limit):
     dataset_name = "coco-image-example"
     if dataset_name in fo.list_datasets():
         fo.delete_dataset(dataset_name)
-    
+
     label_field = "ground_truth"
-    classes = ["dog","umbrella","truck"]
-    
+    classes = ["apple"]
+
     dataset = foz.load_zoo_dataset(
         "coco-2017",
         split="validation",
         label_types=["segmentations"],
         classes=classes,
-        max_samples=100,
+        max_samples=10,
         label_field=label_field,
         dataset_name=dataset_name,
     )
-    
+
     view = dataset.filter_labels(label_field, F("label").is_in(classes))
     os.makedirs(store_dir, exist_ok=True)
     extract_classwise_instances(view, store_dir, label_field, size_lower_limit)
@@ -94,7 +91,9 @@ def image_to_sketch(img, kernel_size=7):
     # convert to sketch
     sketch = cv2.divide(grey, inv_blur, scale=256.0)
 
-    return sketch
+    out = cv2.cvtColor(sketch, cv2.COLOR_GRAY2RGB)
+
+    return out
 
 def pad_resize(img, img_size):
     # pad or resize img to square of side length (img_size)
@@ -118,7 +117,7 @@ def pad_resize(img, img_size):
 def store_inputs(from_dir, to_dir, img_size):
     # store processed images (after concat)
     # size: desired original img size, output will be twice as wide (concat)
-    files = get_images_paths(from_dir, "png")
+    files = get_images_paths(from_dir)
     i=0
     for f in files:
         ext = str(i)+".png"
@@ -139,20 +138,27 @@ def get_data(input_dir):
     inputs = []
 
     for f in input_paths:
-        inputs += cv2.imread(f)
+        inputs.append(cv2.imread(f))
 
-    inputs = np.array(inputs)
+    inputs = np.array(inputs, dtype='float32')
+
+    # print(inputs.shape)
+
+    np.reshape(inputs, (len(input_paths), 64, 128, 3))
+
+    # print(inputs.shape)
 
     return inputs
 
 def main():
-    store_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data" 
-    store_source_img(store_dir)
+    store_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data"
+    size_lower_limit = 20
+    # store_source_img(store_dir, size_lower_limit)
 
-    from_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog"
-    to_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog_sketch"
-    img_size = 64 #each img 500*500*3
-    generate_data(from_dir, to_dir, img_size)
+    from_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/apple"
+    to_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/apple_sketch"
+    img_size = 64
+    # generate_data(from_dir, to_dir, img_size)
 
     get_data(to_dir)
 
