@@ -42,7 +42,7 @@ def train(model, X_train):
         d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
         # ---------------------
-        #  Train Generator
+        #  Train Generator 
         # ---------------------
 
         g_loss = model.combined.train_on_batch(masked_imgs, [missing_parts, valid])
@@ -73,12 +73,12 @@ def train(model, X_train):
 #         masked_imgs[i] = masked_img
 
 #     return masked_imgs, missing_parts, (y1, y2, x1, x2)
-def mask_image(self, imgs):
-    shape = imgs[0].shape
-    mask = np.ones(shape)   #the shape of the images
-    mask[:,shape:,:] = 0.0 
 
-    return mask
+def mask_image(self, imgs):
+    # change mask shape
+    mask_shape = imgs[0].shape[0]
+    imgs[mask_shape // 2:, :, :] = 0.0
+    return imgs
 
 def sample_images(model, epoch, imgs):
     r, c = 3, 6
