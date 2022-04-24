@@ -2,6 +2,7 @@
 
 import argparse
 import numpy as np
+import cv2
 
 from models import *
 from evaluation import *
@@ -31,7 +32,7 @@ def train(model, X_train):
         imgs = X_train[idx]
 
         # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
-        masked_imgs = model.mask_image(imgs)
+        masked_imgs = mask_image(imgs)
 
         # Generate a batch of new images
         gen_missing = model.generator.predict(masked_imgs)
@@ -74,10 +75,10 @@ def train(model, X_train):
 
 #     return masked_imgs, missing_parts, (y1, y2, x1, x2)
 
-def mask_image(self, imgs):
+def mask_image(imgs):
     # change mask shape
-    mask_shape = imgs[0].shape[0]
-    imgs[mask_shape // 2:, :, :] = 0.0
+    mask_shape = imgs.shape[2]
+    imgs[:, :, mask_shape // 2:, :] = 0.0
     return imgs
 
 def sample_images(model, epoch, imgs):
@@ -121,9 +122,9 @@ def save_model(model):
 
 if __name__ == '__main__':
     model = ContextualGAN()
-    eval = evaluation()
+    # eval = evaluation()
     # TODO Import data from preprocess
-    train_input, train_labels, test_input, test_labels = None
+    train_input = get_data("sample_data/apple_sketch")
     train(model, train_input)
-    print(eval.test(model, test_input, test_labels))
-    save_model(model)
+    # print(eval.test(model, test_input, test_labels))
+    # save_model(model)
