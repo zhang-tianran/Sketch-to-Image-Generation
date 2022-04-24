@@ -25,20 +25,7 @@ def get_images_paths(directory_name, image_type):
     return glob.glob(glob.escape(directory_name) + end)
 
 
-def resize(img):
-    '''
-    resize test images to COCO img dims
-
-    Inputs:
-    - img: RGB image
-
-    Returns:
-    - resized image [640, 480, 3]
-    '''
-    pass
-
-
-def image_to_sketch(img, kernel_size=7, greyscale=False):
+def image_to_sketch(img, kernel_size=7):
     """
     Inputs:
     - img: RGB image, ndarray of shape []
@@ -59,95 +46,106 @@ def image_to_sketch(img, kernel_size=7, greyscale=False):
     # convert to sketch
     sketch = cv2.divide(grey, inv_blur, scale=256.0)
 
-    if greyscale:
-        return cv2.cvtColor(sketch, cv2.COLOR_BGR2GRAY)
-    else:
-        return sketch
+    return sketch
 
 
+# def visualize(img):
+#     cv2.imwrite('sketch.png', img)
+#     cv2.imshow('sketch image',img)
+#     cv2.waitKey(0)
+#     cv2.destroyAllWindows()
 
-def visualize(img):
-    cv2.imwrite('sketch.png', img)
-    cv2.imshow('sketch image',img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
 
-
-def extract_classwise_instances(samples, output_dir, label_field, ext=".png"):
+def extract_classwise_instances(samples, output_dir, label_field, size_lower_limit, ext=".png"):
     print("Extracting object instances...")
     for sample in samples.iter_samples(progress=True):
         img = cv2.imread(sample.filepath)
         img_h,img_w,c = img.shape
-        for det in sample[label_field].detections:
-            mask = det.mask
-            [x,y,w,h] = det.bounding_box
-            x = int(x * img_w)
-            y = int(y * img_h)
-            h, w = mask.shape
-            mask_img = img[y:y+h, x:x+w, :]
-            alpha = mask.astype(np.uint8)*255
-            alpha = np.expand_dims(alpha, 2)
-            mask_img = np.concatenate((mask_img, alpha), axis=2)
+        if img_h >= size_lower_limit and img_w >= size_lower_limit:
+            for det in sample[label_field].detections:
+                mask = det.mask
+                [x,y,w,h] = det.bounding_box
+                x = int(x * img_w)
+                y = int(y * img_h)
+                h, w = mask.shape
+                mask_img = img[y:y+h, x:x+w, :]
+                alpha = mask.astype(np.uint8)*255
+                alpha = np.expand_dims(alpha, 2)
+                mask_img = np.concatenate((mask_img, alpha), axis=2)
+                label = det.label
+                label_dir = os.path.join(output_dir, label)
 
-            # TODO: filter image by size, drop small ones
+                if not os.path.exists(label_dir):
+                    os.mkdir(label_dir)
+                output_filepath = os.path.join(label_dir, det.id+ext)
+                cv2.imwrite(output_filepath, mask_img)
 
-            label = det.label
-            label_dir = os.path.join(output_dir, label)
-
-
-
-            if not os.path.exists(label_dir):
-                os.mkdir(label_dir)
-            output_filepath = os.path.join(label_dir, det.id+ext)
-            cv2.imwrite(output_filepath, mask_img)
-
-def convert_dir_to_sketch(dir_path, save_dir):
+def convert_dir_to_sketch(dir_path, save_dir, img_size):
+    # size: desired original img size, output will be twice as wide (concat)
     files = get_images_paths(dir_path, "png")
     i=0
     for f in files:
         ext = str(i)+".png"
         img = cv2.imread(f)
+        img = pad_resize(img, img_size)
         sketch = image_to_sketch(img)
-        cv2.imwrite(os.path.join(save_dir,ext), sketch)
+        out = cv2.hconcat([sketch, img])
+        cv2.imwrite(os.path.join(save_dir, ext), out)
         i +=1
 
-    # TODO: pad original img
-    # TODO: concat img with sketch
+def pad_resize(img, img_size):
+    # pad or resize img to square of side length (img_size)
+    h, w, c = img.shape
+    # white padding
+    color = (255,255,255)
 
+    out = 0
 
+    if h > img_size or w > img_size:
+        x_center = w // 2
+        y_center = h // 2
+        out = img[y_center - img_size // 2 : y_center + img_size // 2, x_center - img_size // 2 : x_center + img_size // 2]
+
+    else:
+        out = np.full((img_size, img_size, c), color, dtype=np.uint8)
+        x_center = (img_size - w) // 2
+        y_center = (img_size - h) // 2
+        out[y_center: y_center + h, x_center: x_center + w] = img
+
+    return out
 
 
 
 def main():
-    #testting whether the code works on the people's dataset
-    # dataset_name = "coco-image-example"
-    # if dataset_name in fo.list_datasets():
-    #     fo.delete_dataset(dataset_name)
-    #
-    # label_field = "ground_truth"
-    # classes = ["dog","umbrella","truck"]
-    #
-    # dataset = foz.load_zoo_dataset(
-    #     "coco-2017",
-    #     split="validation",
-    #     label_types=["segmentations"],
-    #     classes=classes,
-    #     max_samples=100,
-    #     label_field=label_field,
-    #     dataset_name=dataset_name,
-    # )
-    #
-    # view = dataset.filter_labels(label_field, F("label").is_in(classes))
 
-    # output_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data" #change to your desired file path
-    # print("called")
-    # os.makedirs(output_dir,exist_ok=True)
-    #
-    # extract_classwise_instances(view, output_dir, label_field)
+    # get data
+    dataset_name = "coco-image-example"
+    if dataset_name in fo.list_datasets():
+        fo.delete_dataset(dataset_name)
+    
+    label_field = "ground_truth"
+    classes = ["dog","umbrella","truck"]
+    
+    dataset = foz.load_zoo_dataset(
+        "coco-2017",
+        split="validation",
+        label_types=["segmentations"],
+        classes=classes,
+        max_samples=100,
+        label_field=label_field,
+        dataset_name=dataset_name,
+    )
+    
+    view = dataset.filter_labels(label_field, F("label").is_in(classes))
 
+    output_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data" 
+    os.makedirs(output_dir,exist_ok=True)
+    extract_classwise_instances(view, output_dir, label_field, 200)
+
+    # generate sketches
     sketch_out_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog_sketch"
     os.makedirs(sketch_out_dir,exist_ok=True)
-    convert_dir_to_sketch("/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog",sketch_out_dir)
+    convert_dir_to_sketch("/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog",sketch_out_dir, 400)
 
 if __name__ == '__main__':
     main()
