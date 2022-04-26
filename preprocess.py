@@ -166,12 +166,15 @@ def get_data(input_dir):
     return inputs
 
 def main():
-    store_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data"
+    # store_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data"
+    store_dir = "sample_data"
     size_lower_limit = 40
-    # store_source_img(store_dir, size_lower_limit)
+    store_source_img(store_dir, size_lower_limit)
 
-    from_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog"
-    to_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog_sketch1"
+    # from_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog"
+    # to_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog_sketch1"
+    from_dir = "sample_data/dog"
+    to_dir = "sample_data/dog_sketch1"
     img_size = 64
     generate_data(from_dir, to_dir, img_size)
 
