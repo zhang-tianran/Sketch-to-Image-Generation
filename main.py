@@ -4,6 +4,8 @@ import argparse
 import numpy as np
 import cv2
 
+from matplotlib import pyplot as plt
+
 from models import *
 from evaluation import *
 from preprocess import *
@@ -11,7 +13,7 @@ from preprocess import *
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", type=int, default=30000, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
-parser.add_argument("--sample_interval", type=int, default=50, help="interval between image sampling")
+parser.add_argument("--sample_interval", type=int, default=3, help="interval between image sampling")
 opt = parser.parse_args()
 print(opt)
 
@@ -48,16 +50,34 @@ def train(model, X_train):
         #  Train Generator 
         # ---------------------
 
-        g_loss = model.combined.train_on_batch(sketch, [imgs, valid])
+        g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
+
+        # print(gen[0].eval())
+
+
+        # img = gen[1].astype('float32')[:,:,::-1]
+
+        # plt.imshow(img)
+        # plt.show()
+
+    
 
         # Plot the progress
-        print ("%d [D loss: %f, acc: %.2f%%] [G loss: %f, mse: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss[0], g_loss[1]))
+        print ("%d [D loss: %f, acc: %.2f%%] [G loss: %f, contextual loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss[0], g_loss[1]))
+
+
 
         # If at save interval => save generated image samples
-        if epoch % opt.sample_interval == 0:
+        if epoch % opt.sample_interval == 2:
+
+            img = gen[1].astype('float32')[:,:,::-1]
+            plt.imshow(img)
+            plt.show()
+
+
             idx = np.random.randint(0, X_train.shape[0], 6)
             imgs = X_train[idx]
-            sample_images(model, epoch, imgs)
+            # sample_images(model, epoch, imgs)
 
 def mask_image(imgs):
     # change mask shape
@@ -71,23 +91,28 @@ def sample_images(model, epoch, imgs):
 
     # masked_imgs, missing_parts, (y1, y2, x1, x2) = mask_image(imgs)
     masked_imgs = mask_image(imgs)
-    gen_missing = model.generator.predict(masked_imgs)
+    gen = model.generator.predict(masked_imgs)
 
-    imgs = 0.5 * imgs + 0.5
-    masked_imgs = 0.5 * masked_imgs + 0.5
-    gen_missing = 0.5 * gen_missing + 0.5
+    # imgs = 0.5 * imgs + 0.5
+    # masked_imgs = 0.5 * masked_imgs + 0.5
+    # gen = 0.5 * gen_missing + 0.5
 
     fig, axs = plt.subplots(r, c)
     for i in range(c):
-        axs[0,i].imshow(imgs[i, :,:])
+        axs[0,i].imshow(imgs)
         axs[0,i].axis('off')
-        axs[1,i].imshow(masked_imgs[i, :,:])
+        axs[1,i].imshow(gen)
         axs[1,i].axis('off')
-        filled_in = imgs[i].copy()
-        filled_in[y1[i]:y2[i], x1[i]:x2[i], :] = gen_missing[i]
-        axs[2,i].imshow(filled_in)
-        axs[2,i].axis('off')
-    fig.savefig("images/%d.png" % epoch)
+
+        # axs[0,i].imshow(imgs[i, :,:])
+        # axs[0,i].axis('off')
+        # axs[1,i].imshow(masked_imgs[i, :,:])
+        # axs[1,i].axis('off')
+        # filled_in = imgs[i].copy()
+        # filled_in[y1[i]:y2[i], x1[i]:x2[i], :] = gen_missing[i]
+        # axs[2,i].imshow(filled_in)
+        # axs[2,i].axis('off')
+    #fig.savefig("images/%d.png" % epoch)
     plt.close()
 
 def save_model(model):
@@ -110,6 +135,7 @@ if __name__ == '__main__':
     # eval = evaluation()
     # TODO Import data from preprocess
     train_input = get_data("sample_data/apple_sketch")
+
     train(model, train_input)
     # print(eval.test(model, test_input, test_labels))
     # save_model(model)

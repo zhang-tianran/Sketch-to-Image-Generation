@@ -1,5 +1,6 @@
 # Reference: https://github.com/eriklindernoren/Keras-GAN/blob/master/context_encoder/context_encoder.py
 import argparse
+from operator import mod
 import tensorflow as tf
 import keras.backend as K
 import matplotlib.pyplot as plt
@@ -10,7 +11,6 @@ from keras.layers import BatchNormalization, Activation, LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
 from tensorflow.keras.optimizers import Adam
-from keras.losses import KLDivergence as kl
 from tensorflow.keras.utils import to_categorical
 
 parser = argparse.ArgumentParser()
@@ -36,8 +36,8 @@ class ContextualGAN():
         optimizer = Adam(opt.lr, opt.b)
 
         def contextual_loss(y_true, y_pred):
-            y_pred = tf.image.rgb_to_grayscale(tf.slice(y_pred, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
             y_true = tf.image.rgb_to_grayscale(tf.slice(y_true, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
+            y_pred = tf.image.rgb_to_grayscale(tf.slice(y_pred, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
             
             y_pred = tf.divide(tf.add(tf.reshape(y_pred, [tf.shape(y_pred)[0], -1]), 1), 2)
             y_true = tf.divide(tf.add(tf.reshape(y_true, [tf.shape(y_true)[0], -1]), 1), 2)
@@ -46,12 +46,7 @@ class ContextualGAN():
             y_pred = tf.divide(y_true, tf.tile(tf.expand_dims(tf.reduce_sum(y_true, axis=1), 1), [1,tf.shape(y_true)[1]]))
             y_true = tf.divide(y_pred, tf.tile(tf.expand_dims(tf.reduce_sum(y_pred, axis=1), 1), [1,tf.shape(y_pred)[1]]))
             
-            return kl(y_pred, y_true)
-
-        # def total_loss(y_true, y_pred):
-        #     p_loss = K.binary_crossentropy(y_true, y_pred)
-        #     c_loss = contextual_loss(y_true, y_pred)
-        #     return opt.lam1 * p_loss + opt.lam2 * c_loss
+            return tf.reduce_sum(tf.multiply(y_pred, tf.math.log(tf.divide(y_pred, y_true))), axis=1)
 
         # Build and compile the discriminator
         self.discriminator = self.build_discriminator()
@@ -76,7 +71,7 @@ class ContextualGAN():
 
         # The combined model  (stacked generator and discriminator)
         # Trains generator to fool discriminator
-        self.combined = Model(masked_img , [gen_missing, valid])
+        self.combined = Model(masked_img , [valid, gen_missing])
         self.combined.compile(loss=['binary_crossentropy', contextual_loss],
             loss_weights=[opt.lam1, opt.lam2],
             optimizer=optimizer)
@@ -105,7 +100,7 @@ class ContextualGAN():
         model.add(LeakyReLU())
         model.add(Activation('tanh'))
 
-        model.summary()
+        # model.summary()
 
         masked_img = Input(shape=self.img_shape)
         gen_missing = model(masked_img)
@@ -122,9 +117,10 @@ class ContextualGAN():
         model.add(Conv2D(opt.df_dim * 2, 5, 2, 'same'))
         model.add(Conv2D(opt.df_dim * 4, 5, 2, 'same'))
         model.add(Conv2D(opt.df_dim * 8, 5, 2, 'same'))
+        model.add(Flatten())
         model.add(Dense(1, 'softmax'))
 
-        model.summary()
+        # model.summary()
 
         img = Input(shape=self.img_shape)
         validity = model(img)
