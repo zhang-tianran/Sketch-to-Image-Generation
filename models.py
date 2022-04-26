@@ -9,9 +9,9 @@ from keras.layers import Input, Dense, Flatten, Dropout, Reshape
 from keras.layers import BatchNormalization, Activation, LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
-from keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 from keras.losses import KLDivergence as kl
-from keras.utils import to_categorical
+from tensorflow.keras.utils import to_categorical
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lr", type=float, default=0.0002, help="learning rate of optimizer")
@@ -28,13 +28,10 @@ print(opt)
 class ContextualGAN():
     def __init__(self):
         self.img_rows = 64
-        self.img_cols = 64
-        self.mask_height = 8
-        self.mask_width = 8
+        self.img_cols = 128
         self.channels = 3
         self.num_classes = 2
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
-        self.missing_shape = (self.mask_height, self.mask_width, self.channels)
 
         optimizer = Adam(opt.lr, opt.b)
 
@@ -88,8 +85,8 @@ class ContextualGAN():
 
         model = Sequential()
 
-        # TODO
-        model.add(Input((8192*2)))
+        model.add(Input(self.img_shape))
+        model.add(Flatten())
         model.add(Dense(4*8*512))
         model.add(Reshape((4, 8, opt.gf_dim * 8)))
         model.add(Conv2DTranspose(opt.gf_dim * 8, 1, 1, 'same'))
@@ -120,7 +117,7 @@ class ContextualGAN():
         model = Sequential()
 
         # TODO
-        model.add(Input((64, 128, 3)))
+        model.add(Input(self.img_shape))
         model.add(Conv2D(opt.df_dim, 5, 2, 'same'))
         model.add(Conv2D(opt.df_dim * 2, 5, 2, 'same'))
         model.add(Conv2D(opt.df_dim * 4, 5, 2, 'same'))
@@ -129,7 +126,7 @@ class ContextualGAN():
 
         model.summary()
 
-        img = Input(shape=self.missing_shape)
+        img = Input(shape=self.img_shape)
         validity = model(img)
 
         return Model(img, validity)

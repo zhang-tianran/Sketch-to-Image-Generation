@@ -2,6 +2,7 @@
 
 import argparse
 import numpy as np
+import cv2
 
 from models import *
 from evaluation import *
@@ -30,21 +31,24 @@ def train(model, X_train):
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
         imgs = X_train[idx]
 
-        masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
+        # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
+        sketch = mask_image(imgs)
+
+        z_sample = tf.Variable(tf.random.truncated_normal((1, 100)))
 
         # Generate a batch of new images
-        gen_missing = model.generator.predict(masked_imgs)
+        gen = model.generator.predict(sketch)
 
         # Train the discriminator
-        d_loss_real = model.discriminator.train_on_batch(missing_parts, valid)
-        d_loss_fake = model.discriminator.train_on_batch(gen_missing, fake)
+        d_loss_real = model.discriminator.train_on_batch(imgs, valid)
+        d_loss_fake = model.discriminator.train_on_batch(gen, fake)
         d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
         # ---------------------
-        #  Train Generator
+        #  Train Generator 
         # ---------------------
 
-        g_loss = model.combined.train_on_batch(masked_imgs, [missing_parts, valid])
+        g_loss = model.combined.train_on_batch(sketch, [imgs, valid])
 
         # Plot the progress
         print ("%d [D loss: %f, acc: %.2f%%] [G loss: %f, mse: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss[0], g_loss[1]))
@@ -55,28 +59,18 @@ def train(model, X_train):
             imgs = X_train[idx]
             sample_images(model, epoch, imgs)
 
-
-def mask_randomly(self, imgs):
-    y1 = np.random.randint(0, self.img_rows - self.mask_height, imgs.shape[0])
-    y2 = y1 + self.mask_height
-    x1 = np.random.randint(0, self.img_rows - self.mask_width, imgs.shape[0])
-    x2 = x1 + self.mask_width
-
-    masked_imgs = np.empty_like(imgs)
-    missing_parts = np.empty((imgs.shape[0], self.mask_height, self.mask_width, self.channels))
-    for i, img in enumerate(imgs):
-        masked_img = img.copy()
-        _y1, _y2, _x1, _x2 = y1[i], y2[i], x1[i], x2[i]
-        missing_parts[i] = masked_img[_y1:_y2, _x1:_x2, :].copy()
-        masked_img[_y1:_y2, _x1:_x2, :] = 0
-        masked_imgs[i] = masked_img
-
-    return masked_imgs, missing_parts, (y1, y2, x1, x2)
+def mask_image(imgs):
+    # change mask shape
+    mask_shape = imgs.shape[2]
+    sketches = np.copy(imgs)
+    sketches[:, :, mask_shape // 2:, :] = 0.0
+    return sketches
 
 def sample_images(model, epoch, imgs):
     r, c = 3, 6
 
-    masked_imgs, missing_parts, (y1, y2, x1, x2) = mask_randomly(imgs)
+    # masked_imgs, missing_parts, (y1, y2, x1, x2) = mask_image(imgs)
+    masked_imgs = mask_image(imgs)
     gen_missing = model.generator.predict(masked_imgs)
 
     imgs = 0.5 * imgs + 0.5
@@ -113,9 +107,9 @@ def save_model(model):
 
 if __name__ == '__main__':
     model = ContextualGAN()
-    eval = evaluation()
+    # eval = evaluation()
     # TODO Import data from preprocess
-    train_input, train_labels, test_input, test_labels = None
+    train_input = get_data("sample_data/apple_sketch")
     train(model, train_input)
-    print(eval.test(model, test_input, test_labels))
-    save_model(model)
+    # print(eval.test(model, test_input, test_labels))
+    # save_model(model)
