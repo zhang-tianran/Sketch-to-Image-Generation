@@ -64,7 +64,7 @@ class ContextualGAN():
 
         # The generator takes noise as input and generates the missing
         # part of the image
-        masked_img = Input(shape=(64, 128, 2))
+        masked_img = Input(shape=self.img_shape)
         gen_missing = self.generator(masked_img)
 
         # For the combined model we will only train the generator
@@ -85,7 +85,7 @@ class ContextualGAN():
 
         model = Sequential()
 
-        model.add(Input((64, 128, 2)))
+        model.add(Input(self.img_shape))
         model.add(Flatten())
         model.add(Dense(4*8*512))
         model.add(Reshape((4, 8, opt.gf_dim * 8)))
@@ -107,7 +107,7 @@ class ContextualGAN():
 
         model.summary()
 
-        masked_img = Input(shape=(64, 128, 2))
+        masked_img = Input(shape=self.img_shape)
         gen_missing = model(masked_img)
 
         return Model(masked_img, gen_missing)
@@ -117,7 +117,7 @@ class ContextualGAN():
         model = Sequential()
 
         # TODO
-        model.add(Input((64, 128, 3)))
+        model.add(Input(self.img_shape))
         model.add(Conv2D(opt.df_dim, 5, 2, 'same'))
         model.add(Conv2D(opt.df_dim * 2, 5, 2, 'same'))
         model.add(Conv2D(opt.df_dim * 4, 5, 2, 'same'))

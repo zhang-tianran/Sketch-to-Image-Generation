@@ -3,9 +3,9 @@ import tensorflow as tf
 import os
 import glob
 import cv2
-# import fiftyone as fo
-# import fiftyone.zoo as foz
-# from fiftyone import ViewField as F
+import fiftyone as fo
+import fiftyone.zoo as foz
+from fiftyone import ViewField as F
 
 
 def get_images_paths(directory_name, image_type='png'):
