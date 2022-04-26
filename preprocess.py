@@ -54,7 +54,7 @@ def store_source_img(store_dir, size_lower_limit):
         fo.delete_dataset(dataset_name)
 
     label_field = "ground_truth"
-    classes = ["apple"]
+    classes = ["dog"]
 
     dataset = foz.load_zoo_dataset(
         "coco-2017",
@@ -70,7 +70,7 @@ def store_source_img(store_dir, size_lower_limit):
     os.makedirs(store_dir, exist_ok=True)
     extract_classwise_instances(view, store_dir, label_field, size_lower_limit)
 
-def image_to_sketch(img, kernel_size=7):
+def image_to_sketch(img, kernel_size=21):
     """
     Inputs:
     - img: RGB image, ndarray of shape []
@@ -80,18 +80,35 @@ def image_to_sketch(img, kernel_size=7):
     Returns:
     - RGB or greyscale sketch, ndarray of shape [] or []
     """
+
+    # img = adjust_contrast(img)
+
     # convert to greyscale
     grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # invert
     inv = cv2.bitwise_not(grey)
     # blur
-    blur = cv2.GaussianBlur(inv, (kernel_size, kernel_size), 0)
+    blur = cv2.GaussianBlur(inv, (kernel_size, kernel_size), sigmaX=0, sigmaY=0)
     # invert
     inv_blur = cv2.bitwise_not(blur)
     # convert to sketch
     sketch = cv2.divide(grey, inv_blur, scale=256.0)
 
+    # sketch = adjust_contrast(sketch)
+
     out = cv2.cvtColor(sketch, cv2.COLOR_GRAY2RGB)
+
+    return out
+
+# def dodgeV2(x,y):
+#     return cv2.divide(x, 255-y, scale=256)
+
+def adjust_contrast(img):
+
+    # weight = np.ones(img.shape) * 1.2
+    # out = np.uint8(cv2.multiply(np.float32(img), weight))
+
+    out = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 7)
 
     return out
 
@@ -124,6 +141,10 @@ def store_inputs(from_dir, to_dir, img_size):
         img = cv2.imread(f)
         img = pad_resize(img, img_size)
         sketch = image_to_sketch(img)
+
+        # img = pad_resize(img, img_size)
+        # sketch = pad_resize(sketch, img_size)
+
         out = cv2.hconcat([sketch, img])
         cv2.imwrite(os.path.join(to_dir, ext), out)
         i+=1
@@ -142,25 +163,18 @@ def get_data(input_dir):
 
     inputs = np.array(inputs, dtype='float32')
 
-    # print(inputs.shape)
-
-    np.reshape(inputs, (len(input_paths), 64, 128, 3))
-
-    # print(inputs.shape)
-
     return inputs
 
 def main():
     store_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data"
-    size_lower_limit = 20
+    size_lower_limit = 40
     # store_source_img(store_dir, size_lower_limit)
 
-    from_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/apple"
-    to_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/apple_sketch"
+    from_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog"
+    to_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog_sketch1"
     img_size = 64
-    # generate_data(from_dir, to_dir, img_size)
+    generate_data(from_dir, to_dir, img_size)
 
-    get_data(to_dir)
 
 if __name__ == '__main__':
     main()
