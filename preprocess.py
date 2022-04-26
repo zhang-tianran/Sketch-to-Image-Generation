@@ -94,7 +94,7 @@ def image_to_sketch(img, kernel_size=21):
     # convert to sketch
     sketch = cv2.divide(grey, inv_blur, scale=256.0)
 
-    # sketch = adjust_contrast(sketch)
+    sketch = adjust_contrast(sketch)
 
     out = cv2.cvtColor(sketch, cv2.COLOR_GRAY2RGB)
 
