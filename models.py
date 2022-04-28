@@ -11,7 +11,6 @@ from keras.layers import BatchNormalization, Activation, LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.utils import to_categorical
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lr", type=float, default=0.0002, help="learning rate of optimizer")
@@ -22,8 +21,6 @@ parser.add_argument("--batch_size", type=int, default=64, help="size of the batc
 parser.add_argument("--gf_dim", type=int, default=64, help="dimension of gen filters in first conv layer.")
 parser.add_argument("--df_dim", type=int, default=64, help="dimension of discrim filters in first conv layer.")
 opt = parser.parse_args()
-print(opt)
-
 
 class ContextualGAN():
     def __init__(self):

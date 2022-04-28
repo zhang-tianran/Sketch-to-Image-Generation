@@ -15,7 +15,6 @@ parser.add_argument("--epochs", type=int, default=30000, help="number of epochs 
 parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 parser.add_argument("--sample_interval", type=int, default=3, help="interval between image sampling")
 opt = parser.parse_args()
-print(opt)
 
 def train(model, X_train):
 
@@ -31,7 +30,11 @@ def train(model, X_train):
 
         # Select a random batch of images
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
-        imgs = X_train[idx]
+        imgs = X_train[idx].astype('float32') / 255
+
+        # img = imgs[1].astype('float32')[:,:,::-1]
+        # plt.imshow(img)
+        # plt.show()
 
         # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
         sketch = mask_image(imgs)
@@ -40,6 +43,10 @@ def train(model, X_train):
 
         # Generate a batch of new images
         gen = model.generator.predict(sketch)
+
+        img = gen[1].astype('float32')[:,:,::-1]
+        plt.imshow(img)
+        plt.show()
 
         # Train the discriminator
         d_loss_real = model.discriminator.train_on_batch(imgs, valid)
@@ -60,21 +67,12 @@ def train(model, X_train):
         # plt.imshow(img)
         # plt.show()
 
-    
-
         # Plot the progress
         print ("%d [D loss: %f, acc: %.2f%%] [G loss: %f, contextual loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss[0], g_loss[1]))
 
 
-
         # If at save interval => save generated image samples
         if epoch % opt.sample_interval == 2:
-
-            img = gen[1].astype('float32')[:,:,::-1]
-            img = 0.5 * img + 0.5
-            plt.imshow(img)
-            plt.show()
-
 
             idx = np.random.randint(0, X_train.shape[0], 6)
             imgs = X_train[idx]
@@ -84,7 +82,7 @@ def mask_image(imgs):
     # change mask shape
     mask_shape = imgs.shape[2]
     sketches = np.copy(imgs)
-    sketches[:, :, mask_shape // 2:, :] = 0.0
+    sketches[:, :, mask_shape // 2:, :] = 1.0
     return sketches
 
 def sample_images(model, epoch, imgs):
@@ -116,23 +114,20 @@ def sample_images(model, epoch, imgs):
     #fig.savefig("images/%d.png" % epoch)
     plt.close()
 
-def save_model(model):
+def save_model(model, model_name):
 
-    def save(model, model_name):
-        model_path = "saved_model/%s.json" % model_name
-        weights_path = "saved_model/%s_weights.hdf5" % model_name
-        options = {"file_arch": model_path,
-                    "file_weight": weights_path}
-        json_string = model.to_json()
-        open(options['file_arch'], 'w').write(json_string)
-        model.save_weights(options['file_weight'])
-
-    save(model.generator, "generator")
-    save(model.discriminator, "discriminator")
+    model_path = "saved_model/%s.json" % model_name
+    weights_path = "saved_model/%s_weights.hdf5" % model_name
+    options = {"file_arch": model_path,
+                "file_weight": weights_path}
+    json_string = model.to_json()
+    open(options['file_arch'], 'w').write(json_string)
+    model.save_weights(options['file_weight'])
 
 
 if __name__ == '__main__':
     model = ContextualGAN()
+    # save_model(model, "test")
     # eval = evaluation()
     # TODO Import data from preprocess
     train_input = get_data("sample_data/apple_sketch")
