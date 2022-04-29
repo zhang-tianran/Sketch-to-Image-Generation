@@ -44,10 +44,6 @@ def train(model, X_train):
         # Generate a batch of new images
         gen = model.generator.predict(sketch)
 
-        img = gen[1].astype('float32')[:,:,::-1]
-        plt.imshow(img)
-        plt.show()
-
         # Train the discriminator
         d_loss_real = model.discriminator.train_on_batch(imgs, valid)
         d_loss_fake = model.discriminator.train_on_batch(gen, fake)
@@ -59,14 +55,6 @@ def train(model, X_train):
 
         g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
 
-        # print(gen[0].eval())
-
-
-        # img = gen[1].astype('float32')[:,:,::-1]
-
-        # plt.imshow(img)
-        # plt.show()
-
         # Plot the progress
         print ("%d [D loss: %f, acc: %.2f%%] [G loss: %f, contextual loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss[0], g_loss[1]))
 
@@ -76,6 +64,10 @@ def train(model, X_train):
 
             idx = np.random.randint(0, X_train.shape[0], 6)
             imgs = X_train[idx]
+
+            img = gen[1].astype('float32')[:,:,::-1]
+            plt.imshow(img)
+            plt.show()
             # sample_images(model, epoch, imgs)
 
 def mask_image(imgs):
@@ -114,24 +106,24 @@ def sample_images(model, epoch, imgs):
     #fig.savefig("images/%d.png" % epoch)
     plt.close()
 
-def save_model(model, model_name):
+def save_model(model):
+    model.discriminator.save("saved_model/discriminator")
+    model.generator.save("saved_model/generator")
 
-    model_path = "saved_model/%s.json" % model_name
-    weights_path = "saved_model/%s_weights.hdf5" % model_name
-    options = {"file_arch": model_path,
-                "file_weight": weights_path}
-    json_string = model.to_json()
-    open(options['file_arch'], 'w').write(json_string)
-    model.save_weights(options['file_weight'])
-
+def load_model(model): 
+    model.discriminator = tf.keras.models.load_model("saved_model/discriminator")
+    model.generator = tf.keras.models.load_model("saved_model/generator")
 
 if __name__ == '__main__':
     model = ContextualGAN()
-    # save_model(model, "test")
+        
+    # save_model(model)
+    # load_model(model)
+
     # eval = evaluation()
-    # TODO Import data from preprocess
+
+    # Import data from preprocess
     train_input = get_data("sample_data/apple_sketch")
 
     train(model, train_input)
     # print(eval.test(model, test_input, test_labels))
-    # save_model(model)
