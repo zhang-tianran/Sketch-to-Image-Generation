@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from models import *
 from evaluation import *
 from preprocess import *
+from visualizer import * 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", type=int, default=30000, help="number of epochs of training")
@@ -106,9 +107,22 @@ def sample_images(model, epoch, imgs):
     #fig.savefig("images/%d.png" % epoch)
     plt.close()
 
-def save_model(model):
-    model.discriminator.save("saved_model/discriminator")
-    model.generator.save("saved_model/generator")
+def save_model(model, train_X):
+    """
+    input param: model is the trained GAN model including both generator and discrinminator 
+    input param: train_X is the training dataset, used to sample randomly and generate sketch
+    """
+    # model.discriminator.save("saved_model/discriminator")
+    # model.generator.save("saved_model/generator")
+    
+    train_num = 100
+    true_sample = train_X[train_num-2:train_num+2]       ## 4 real images
+    fake_sample = model.sample_z(4)             ## 4 z realizations
+    viz_callback = EpochVisualizer(model, [true_sample, fake_sample])
+
+    viz_callback.save_png('generation')
+    IPython.display.Image(open('generation.png','rb').read())
+
 
 def load_model(model): 
     model.discriminator = tf.keras.models.load_model("saved_model/discriminator")

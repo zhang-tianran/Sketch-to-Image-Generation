@@ -22,6 +22,14 @@ parser.add_argument("--gf_dim", type=int, default=64, help="dimension of gen fil
 parser.add_argument("--df_dim", type=int, default=64, help="dimension of discrim filters in first conv layer.")
 opt = parser.parse_args()
 
+#added for visualization purpose
+def log_if_unsafe(func, msg="unsafe operation"):
+    '''Function wrapper. Warns if function is not called with safe param'''
+    def output_fn(*args, safe=False, **kwargs):
+        if not safe: print(f"Warning: {msg}")
+        return func(*args, **kwargs)
+    return output_fn
+
 class ContextualGAN():
     def __init__(self):
         self.img_rows = 64
@@ -73,6 +81,9 @@ class ContextualGAN():
             loss_weights=[opt.lam1, opt.lam2],
             optimizer=optimizer)
 
+        #added for visualization purpose
+        self.z_sampler = log_if_unsafe(z_sampler, "z_sampler(shape, ...) is an internal function. Consider using sample_z(n)")
+
     def build_generator(self):
 
         model = Sequential()
@@ -123,3 +134,8 @@ class ContextualGAN():
         validity = model(img)
 
         return Model(img, validity)
+
+    #for visualization purpose
+    def sample_z(self, num_samples, **kwargs):
+        '''generates a z realization from the z sampler'''
+        return self.z_sampler([num_samples, *self.z_dims[1:]], safe=True)
