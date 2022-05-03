@@ -60,15 +60,16 @@ def store_source_img(store_dir, size_lower_limit):
         "coco-2017",
         split="validation",
         label_types=["segmentations"],
-        classes=classes,
-        max_samples=10,
+        # classes=classes,
+        # max_samples=10,
         label_field=label_field,
         dataset_name=dataset_name,
+        shuffle=True,
     )
 
-    view = dataset.filter_labels(label_field, F("label").is_in(classes))
+    # view = dataset.filter_labels(label_field, F("label").is_in(classes))
     os.makedirs(store_dir, exist_ok=True)
-    extract_classwise_instances(view, store_dir, label_field, size_lower_limit)
+    extract_classwise_instances(dataset, store_dir, label_field, size_lower_limit)
 
 def image_to_sketch(img, kernel_size=21):
     """
@@ -94,7 +95,7 @@ def image_to_sketch(img, kernel_size=21):
     # convert to sketch
     sketch = cv2.divide(grey, inv_blur, scale=256.0)
 
-    sketch = adjust_contrast(sketch)
+    # sketch = adjust_contrast(sketch)
 
     out = cv2.cvtColor(sketch, cv2.COLOR_GRAY2RGB)
 
@@ -131,11 +132,10 @@ def pad_resize(img, img_size):
 
     return out
 
-def store_inputs(from_dir, to_dir, img_size):
+def store_inputs(from_dir, to_dir, img_size, i):
     # store processed images (after concat)
     # size: desired original img size, output will be twice as wide (concat)
     files = get_images_paths(from_dir)
-    i=0
     for f in files:
         ext = str(i)+".png"
         img = cv2.imread(f)
@@ -148,11 +148,17 @@ def store_inputs(from_dir, to_dir, img_size):
         out = cv2.hconcat([sketch, img])
         cv2.imwrite(os.path.join(to_dir, ext), out)
         i+=1
+    return i
 
 def generate_data(from_dir, to_dir, img_size):
     # generate sketches
     os.makedirs(to_dir, exist_ok=True)
-    store_inputs(from_dir, to_dir, img_size)
+
+    folders = glob.glob(f'{from_dir}/*/')
+    i=0
+    for f in folders:
+        print(f)
+        i = store_inputs(f, to_dir, img_size,i)
 
 def get_data(input_dir):
     input_paths = get_images_paths(input_dir)
@@ -167,14 +173,12 @@ def get_data(input_dir):
 
 def main():
     # store_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data"
-    store_dir = "sample_data"
-    size_lower_limit = 40
-    store_source_img(store_dir, size_lower_limit)
+    # store_dir = "sample_data"
+    # size_lower_limit = 40
+    # store_source_img(store_dir, size_lower_limit)
 
-    # from_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog"
-    # to_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data/dog_sketch1"
-    from_dir = "sample_data/dog"
-    to_dir = "sample_data/dog_sketch1"
+    from_dir = "/home/sli144/course/cs1470/final_project/Sketch-to-Image-Generation/sample_data/images"
+    to_dir = "/home/sli144/course/cs1470/final_project/Sketch-to-Image-Generation/sample_data/sketches_grayscale"
     img_size = 64
     generate_data(from_dir, to_dir, img_size)
 
