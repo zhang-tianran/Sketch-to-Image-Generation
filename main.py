@@ -14,7 +14,7 @@ from preprocess import *
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", type=int, default=30000, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=128, help="size of the batches")
-parser.add_argument("--sample_interval", type=int, default=3, help="interval between image sampling")
+parser.add_argument("--sample_interval", type=int, default=10, help="interval between image sampling")
 parser.add_argument("--z_dim", type=int, default=100, help="dimension of z sampler.")
 opt = parser.parse_args()
 
@@ -70,9 +70,12 @@ def train(model, X_train):
 
         if epoch % opt.sample_interval == 0:
             img = gen[1].astype('float32')[:,:,::-1]
+            img = np.clip(img, 0, 1)
             plt.imshow(img)
-            plt.savefig(f'{epoch}.png')
+            plt.savefig(f'saved_img/{epoch}.png')
             plt.close()
+        
+        if epoch % 50 == 0: 
             visualize_loss(d_loss_list, g_loss_list)
 
 
@@ -160,7 +163,7 @@ if __name__ == '__main__':
     # eval = evaluation()
 
     # Import data from preprocess
-    train_input = get_data("sample_data/test")
+    train_input = get_data("sample_data/sketches_grayscale")
 
     train(model, train_input)
     # print(eval.test(model, test_input, test_labels))
