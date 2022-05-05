@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", type=int, default=30000, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 parser.add_argument("--sample_interval", type=int, default=3, help="interval between image sampling")
+parser.add_argument("--z_dim", type=int, default=100, help="dimension of z sampler.")
 opt = parser.parse_args()
 
 def train(model, X_train):
@@ -40,7 +41,7 @@ def train(model, X_train):
         # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
         sketch = mask_image(imgs)
 
-        z_sample = tf.Variable(tf.random.truncated_normal((1, 100)))
+        z_sample = np.random.uniform(-1, 1, size=(opt.batch_size , opt.z_dim))
 
         # Generate a batch of new images
         gen = model.generator.predict(sketch)
@@ -61,14 +62,16 @@ def train(model, X_train):
 
 
         # If at save interval => save generated image samples
-        if epoch % opt.sample_interval == 2:
+        if epoch % opt.sample_interval == 0:
 
             idx = np.random.randint(0, X_train.shape[0], 6)
             imgs = X_train[idx]
 
             img = gen[1].astype('float32')[:,:,::-1]
             plt.imshow(img)
-            plt.show()
+            plt.savefig("saved_img/%d.png" % (epoch))
+            plt.clf()
+            plt.close()
             # sample_images(model, epoch, imgs)
 
 def mask_image(imgs):
@@ -112,16 +115,16 @@ def save_model(model, train_X):
     input param: model is the trained GAN model including both generator and discrinminator 
     input param: train_X is the training dataset, used to sample randomly and generate sketch
     """
-    # model.discriminator.save("saved_model/discriminator")
-    # model.generator.save("saved_model/generator")
+    model.discriminator.save("saved_model/discriminator")
+    model.generator.save("saved_model/generator")
     
-    train_num = 100
-    true_sample = train_X[train_num-2:train_num+2]       ## 4 real images
-    fake_sample = model.sample_z(4)             ## 4 z realizations
-    viz_callback = EpochVisualizer(model, [true_sample, fake_sample])
+    # train_num = 100
+    # true_sample = train_X[train_num-2:train_num+2]       ## 4 real images
+    # fake_sample = model.sample_z(4)             ## 4 z realizations
+    # viz_callback = EpochVisualizer(model, [true_sample, fake_sample])
 
-    viz_callback.save_png('generation')
-    IPython.display.Image(open('generation.png','rb').read())
+    # viz_callback.save_png('generation')
+    # IPython.display.Image(open('generation.png','rb').read())
 
 
 def load_model(model): 
@@ -137,7 +140,7 @@ if __name__ == '__main__':
     # eval = evaluation()
 
     # Import data from preprocess
-    train_input = get_data("sample_data/apple_sketch")
+    train_input = get_data("sample_data/sketches_grayscale")
 
     train(model, train_input)
     # print(eval.test(model, test_input, test_labels))
