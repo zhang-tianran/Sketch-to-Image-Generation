@@ -15,9 +15,9 @@ from tensorflow.keras.optimizers import Adam
 parser = argparse.ArgumentParser()
 parser.add_argument("--lr", type=float, default=0.0002, help="learning rate of optimizer")
 parser.add_argument("--b", type=float, default=0.5, help="beta of optimizer")
-parser.add_argument("--lam1", type=float, default=1, help="coefficient of perceptual loss")
-parser.add_argument("--lam2", type=float, default=0.5, help="coefficient of contextual loss")
-parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
+parser.add_argument("--lam1", type=float, default=0.001, help="coefficient of perceptual loss")
+parser.add_argument("--lam2", type=float, default=0.999, help="coefficient of contextual loss")
+parser.add_argument("--batch_size", type=int, default=128, help="size of the batches")
 parser.add_argument("--gf_dim", type=int, default=64, help="dimension of gen filters in first conv layer.")
 parser.add_argument("--df_dim", type=int, default=64, help="dimension of discrim filters in first conv layer.")
 opt = parser.parse_args()
@@ -38,26 +38,27 @@ class ContextualGAN():
         self.num_classes = 2
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
 
-        optimizer = Adam(opt.lr, opt.b)
+        self.optimizer = Adam(opt.lr, opt.b)
 
         def contextual_loss(y_true, y_pred):
             y_true = tf.image.rgb_to_grayscale(tf.slice(y_true, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
             y_pred = tf.image.rgb_to_grayscale(tf.slice(y_pred, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
             
-            y_pred = tf.divide(tf.add(tf.reshape(y_pred, [tf.shape(y_pred)[0], -1]), 1), 2)
             y_true = tf.divide(tf.add(tf.reshape(y_true, [tf.shape(y_true)[0], -1]), 1), 2)
+            y_pred = tf.divide(tf.add(tf.reshape(y_pred, [tf.shape(y_pred)[0], -1]), 1), 2)
                 
             # normalize sum to 1
-            y_pred = tf.divide(y_true, tf.tile(tf.expand_dims(tf.reduce_sum(y_true, axis=1), 1), [1,tf.shape(y_true)[1]]))
-            y_true = tf.divide(y_pred, tf.tile(tf.expand_dims(tf.reduce_sum(y_pred, axis=1), 1), [1,tf.shape(y_pred)[1]]))
+            y_true = tf.divide(y_true, tf.tile(tf.expand_dims(tf.reduce_sum(y_true, axis=1), 1), [1,tf.shape(y_true)[1]]))
+            y_pred = tf.divide(y_pred, tf.tile(tf.expand_dims(tf.reduce_sum(y_pred, axis=1), 1), [1,tf.shape(y_pred)[1]]))
             
-            return tf.reduce_sum(tf.multiply(y_pred, tf.math.log(tf.divide(y_pred, y_true))), axis=1)
+            res = tf.reduce_sum(tf.multiply(y_true, tf.math.log(tf.divide(y_true, y_pred))), axis=1)
+
+            return res
 
         # Build and compile the discriminator
         self.discriminator = self.build_discriminator()
         self.discriminator.compile(loss='binary_crossentropy',
-            optimizer=optimizer,
-            metrics=['accuracy'])
+            optimizer=self.optimizer)
 
         # Build the generator
         self.generator = self.build_generator()
@@ -79,10 +80,10 @@ class ContextualGAN():
         self.combined = Model(masked_img , [valid, gen_missing])
         self.combined.compile(loss=['binary_crossentropy', contextual_loss],
             loss_weights=[opt.lam1, opt.lam2],
-            optimizer=optimizer)
+            optimizer=self.optimizer)
 
         #added for visualization purpose
-        self.z_sampler = log_if_unsafe(z_sampler, "z_sampler(shape, ...) is an internal function. Consider using sample_z(n)")
+        # self.z_sampler = log_if_unsafe(z_sampler, "z_sampler(shape, ...) is an internal function. Consider using sample_z(n)")
 
     def build_generator(self):
 

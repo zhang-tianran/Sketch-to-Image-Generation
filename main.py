@@ -9,11 +9,11 @@ from matplotlib import pyplot as plt
 from models import *
 from evaluation import *
 from preprocess import *
-from visualizer import * 
+# from visualizer import * 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", type=int, default=30000, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=128, help="size of the batches")
 parser.add_argument("--sample_interval", type=int, default=3, help="interval between image sampling")
 opt = parser.parse_args()
 
@@ -23,6 +23,8 @@ def train(model, X_train):
     valid = np.ones((opt.batch_size, 1))
     fake = np.zeros((opt.batch_size, 1))
 
+    X_train = X_train.astype('float32') / 127.5 - 1.
+
     for epoch in range(opt.epochs):
 
         # ---------------------
@@ -31,7 +33,7 @@ def train(model, X_train):
 
         # Select a random batch of images
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
-        imgs = X_train[idx].astype('float32') / 255
+        imgs = X_train[idx]
 
         # img = imgs[1].astype('float32')[:,:,::-1]
         # plt.imshow(img)
@@ -57,18 +59,27 @@ def train(model, X_train):
         g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
 
         # Plot the progress
-        print ("%d [D loss: %f, acc: %.2f%%] [G loss: %f, contextual loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss[0], g_loss[1]))
+        print ("%d [D loss: %f] [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, d_loss, g_loss[0], g_loss[1], g_loss[2]))
+
+        if epoch % 5 == 4:
+            img = gen[1].astype('float32')[:,:,::-1]
+            img = 0.5 * img + 0.5
+            plt.imshow(img)
+            plt.savefig(f'{epoch}.png')
+            plt.close()
 
 
         # If at save interval => save generated image samples
-        if epoch % opt.sample_interval == 2:
+        # if epoch % opt.sample_interval == 2:
 
-            idx = np.random.randint(0, X_train.shape[0], 6)
-            imgs = X_train[idx]
+            # idx = np.random.randint(0, X_train.shape[0], 6)
+            # imgs = X_train[idx]
 
-            img = gen[1].astype('float32')[:,:,::-1]
-            plt.imshow(img)
-            plt.show()
+            # img = gen[1].astype('float32')[:,:,::-1]
+            # img = 0.5 * img + 0.5
+            # plt.imshow(img)
+            # plt.savefig(f'{epoch}.png')
+            # plt.close()
             # sample_images(model, epoch, imgs)
 
 def mask_image(imgs):
@@ -107,21 +118,21 @@ def sample_images(model, epoch, imgs):
     #fig.savefig("images/%d.png" % epoch)
     plt.close()
 
-def save_model(model, train_X):
-    """
-    input param: model is the trained GAN model including both generator and discrinminator 
-    input param: train_X is the training dataset, used to sample randomly and generate sketch
-    """
-    # model.discriminator.save("saved_model/discriminator")
-    # model.generator.save("saved_model/generator")
+# def save_model(model, train_X):
+#     """
+#     input param: model is the trained GAN model including both generator and discrinminator 
+#     input param: train_X is the training dataset, used to sample randomly and generate sketch
+#     """
+#     # model.discriminator.save("saved_model/discriminator")
+#     # model.generator.save("saved_model/generator")
     
-    train_num = 100
-    true_sample = train_X[train_num-2:train_num+2]       ## 4 real images
-    fake_sample = model.sample_z(4)             ## 4 z realizations
-    viz_callback = EpochVisualizer(model, [true_sample, fake_sample])
+#     train_num = 100
+#     true_sample = train_X[train_num-2:train_num+2]       ## 4 real images
+#     fake_sample = model.sample_z(4)             ## 4 z realizations
+#     viz_callback = EpochVisualizer(model, [true_sample, fake_sample])
 
-    viz_callback.save_png('generation')
-    IPython.display.Image(open('generation.png','rb').read())
+#     viz_callback.save_png('generation')
+#     IPython.display.Image(open('generation.png','rb').read())
 
 
 def load_model(model): 
@@ -137,7 +148,7 @@ if __name__ == '__main__':
     # eval = evaluation()
 
     # Import data from preprocess
-    train_input = get_data("sample_data/apple_sketch")
+    train_input = get_data("sample_data/test")
 
     train(model, train_input)
     # print(eval.test(model, test_input, test_labels))
