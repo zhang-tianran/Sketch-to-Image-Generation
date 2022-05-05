@@ -22,14 +22,6 @@ parser.add_argument("--gf_dim", type=int, default=64, help="dimension of gen fil
 parser.add_argument("--df_dim", type=int, default=64, help="dimension of discrim filters in first conv layer.")
 opt = parser.parse_args()
 
-#added for visualization purpose
-def log_if_unsafe(func, msg="unsafe operation"):
-    '''Function wrapper. Warns if function is not called with safe param'''
-    def output_fn(*args, safe=False, **kwargs):
-        if not safe: print(f"Warning: {msg}")
-        return func(*args, **kwargs)
-    return output_fn
-
 class ContextualGAN():
     def __init__(self):
         self.img_rows = 64
@@ -50,10 +42,8 @@ class ContextualGAN():
             # normalize sum to 1
             y_true = tf.divide(y_true, tf.tile(tf.expand_dims(tf.reduce_sum(y_true, axis=1), 1), [1,tf.shape(y_true)[1]]))
             y_pred = tf.divide(y_pred, tf.tile(tf.expand_dims(tf.reduce_sum(y_pred, axis=1), 1), [1,tf.shape(y_pred)[1]]))
-            
-            res = tf.reduce_sum(tf.multiply(y_true, tf.math.log(tf.divide(y_true, y_pred))), axis=1)
 
-            return res
+            return tf.reduce_sum(tf.multiply(y_true, tf.math.log(tf.divide(y_true, y_pred))), axis=1)
 
         # Build and compile the discriminator
         self.discriminator = self.build_discriminator()
@@ -135,8 +125,3 @@ class ContextualGAN():
         validity = model(img)
 
         return Model(img, validity)
-
-    #for visualization purpose
-    def sample_z(self, num_samples, **kwargs):
-        '''generates a z realization from the z sampler'''
-        return self.z_sampler([num_samples, *self.z_dims[1:]], safe=True)
