@@ -6,10 +6,11 @@ import keras.backend as K
 import matplotlib.pyplot as plt
 import numpy as np
 
-from keras.layers import Input, Dense, Flatten, Dropout, Reshape
-from keras.layers import BatchNormalization, Activation, LeakyReLU
+
+from tensorflow.keras.layers import Input, Dense, Flatten, Dropout, Reshape
+from tensorflow.keras.layers import BatchNormalization, Activation, LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
-from keras.models import Sequential, Model
+from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.optimizers import Adam
 
 parser = argparse.ArgumentParser()
