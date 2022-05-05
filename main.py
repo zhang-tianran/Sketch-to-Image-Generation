@@ -26,7 +26,9 @@ def train(model, X_train):
     valid = np.ones((opt.batch_size, 1))
     fake = np.zeros((opt.batch_size, 1))
 
-    X_train = X_train.astype('float32') / 127.5 - 1.
+    # X_train = X_train.astype('float32') / 127.5 - 1.
+
+    X_train = X_train.astype('float32') / 255
 
     for epoch in range(opt.epochs):
 
@@ -38,14 +40,10 @@ def train(model, X_train):
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
         imgs = X_train[idx]
 
-        # img = imgs[1].astype('float32')[:,:,::-1]
-        # plt.imshow(img)
-        # plt.show()
-
         # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
         sketch = mask_image(imgs)
 
-        z_sample = np.random.uniform(-1, 1, size=(opt.batch_size , opt.z_dim))
+        # z_sample = np.random.uniform(-1, 1, size=(opt.batch_size , opt.z_dim))
 
         # Generate a batch of new images
         gen = model.generator.predict(sketch)
@@ -73,18 +71,6 @@ def train(model, X_train):
         if epoch % 50 == 0: 
             visualize_loss(d_loss_list, g_loss_list)
 
-
-        # If at save interval => save generated image samples
-        # if epoch % opt.sample_interval == 2:
-            # idx = np.random.randint(0, X_train.shape[0], 6)
-            # imgs = X_train[idx]
-
-            # img = gen[1].astype('float32')[:,:,::-1]
-            # img = 0.5 * img + 0.5
-            # plt.imshow(img)
-            # plt.savefig(f'saved_img/{epoch}.png')
-            # plt.close()
-            # sample_images(model, epoch, imgs)
 
 def mask_image(imgs):
     # change mask shape

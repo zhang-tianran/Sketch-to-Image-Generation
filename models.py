@@ -1,14 +1,14 @@
 # Reference: https://github.com/eriklindernoren/Keras-GAN/blob/master/context_encoder/context_encoder.py
 import argparse
 from operator import mod
+import tensorflow
 import tensorflow as tf
 import keras.backend as K
 import matplotlib.pyplot as plt
 import numpy as np
 
-
-from tensorflow.keras.layers import Input, Dense, Flatten, Dropout, Reshape
-from tensorflow.keras.layers import BatchNormalization, Activation, LeakyReLU
+from keras.layers import Input, Dense, Flatten, Dropout, Reshape
+from keras.layers import BatchNormalization, Activation, LeakyReLU
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.optimizers import Adam
