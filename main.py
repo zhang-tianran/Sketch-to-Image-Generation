@@ -20,6 +20,9 @@ opt = parser.parse_args()
 
 def train(model, X_train):
 
+    d_loss_list = []
+    g_loss_list = []
+
     # Adversarial ground truths
     valid = np.ones((opt.batch_size, 1))
     fake = np.zeros((opt.batch_size, 1))
@@ -59,15 +62,19 @@ def train(model, X_train):
 
         g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
 
+        d_loss_list.append(d_loss)
+        g_loss_list.append(g_loss[0])
+
         # Plot the progress
         print ("%d [D loss: %f] [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, d_loss, g_loss[0], g_loss[1], g_loss[2]))
 
-        if epoch % 5 == 4:
+        if epoch % opt.sample_interval == 0:
             img = gen[1].astype('float32')[:,:,::-1]
             img = 0.5 * img + 0.5
             plt.imshow(img)
             plt.savefig(f'{epoch}.png')
             plt.close()
+            visualize_loss(d_loss_list, g_loss_list)
 
 
         # If at save interval => save generated image samples
@@ -78,7 +85,7 @@ def train(model, X_train):
             # img = gen[1].astype('float32')[:,:,::-1]
             # img = 0.5 * img + 0.5
             # plt.imshow(img)
-            # plt.savefig(f'{epoch}.png')
+            # plt.savefig(f'saved_img/{epoch}.png')
             # plt.close()
             # sample_images(model, epoch, imgs)
 
@@ -118,22 +125,27 @@ def sample_images(model, epoch, imgs):
     #fig.savefig("images/%d.png" % epoch)
     plt.close()
 
+def visualize_loss(d_loss, g_loss): 
+    """
+    Uses Matplotlib to visualize the losses of our model.
+    :param losses: list of loss data stored from train. Can use the model's loss_list 
+    field 
+    """
+    x = [i for i in range(len(d_loss))]
+    plt.plot(x, d_loss, color="blue", label="d_loss")
+    plt.plot(x, g_loss, color="green", label="g_loss")
+    plt.title('Loss per batch')
+    plt.xlabel('Batch')
+    plt.ylabel('Loss')
+    plt.show()  
 
-def save_model(model, train_X):
+def save_model(model):
     """
     input param: model is the trained GAN model including both generator and discrinminator 
     input param: train_X is the training dataset, used to sample randomly and generate sketch
     """
     model.discriminator.save("saved_model/discriminator")
     model.generator.save("saved_model/generator")
-    
-    # train_num = 100
-    # true_sample = train_X[train_num-2:train_num+2]       ## 4 real images
-    # fake_sample = model.sample_z(4)             ## 4 z realizations
-    # viz_callback = EpochVisualizer(model, [true_sample, fake_sample])
-
-    # viz_callback.save_png('generation')
-    # IPython.display.Image(open('generation.png','rb').read())
 
 
 def load_model(model): 

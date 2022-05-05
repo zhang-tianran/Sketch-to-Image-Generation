@@ -72,8 +72,6 @@ class ContextualGAN():
             loss_weights=[opt.lam1, opt.lam2],
             optimizer=self.optimizer)
 
-        #added for visualization purpose
-        # self.z_sampler = log_if_unsafe(z_sampler, "z_sampler(shape, ...) is an internal function. Consider using sample_z(n)")
 
     def build_generator(self):
 
