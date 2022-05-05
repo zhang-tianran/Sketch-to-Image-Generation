@@ -70,7 +70,6 @@ def train(model, X_train):
 
         if epoch % opt.sample_interval == 0:
             img = gen[1].astype('float32')[:,:,::-1]
-            img = 0.5 * img + 0.5
             plt.imshow(img)
             plt.savefig(f'{epoch}.png')
             plt.close()
