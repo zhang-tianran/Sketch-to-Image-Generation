@@ -71,7 +71,7 @@ def train(model, X_train):
         if epoch % opt.sample_interval == 0:
             img = gen[1].astype('float32')[:,:,::-1]
             plt.imshow(img)
-            plt.savefig(f'{epoch}.png')
+            plt.savefig(f'saved_img/{epoch}.png')
             plt.close()
             visualize_loss(d_loss_list, g_loss_list)
 
