@@ -17,7 +17,7 @@ parser.add_argument("--sample_interval", type=int, default=10, help="interval be
 parser.add_argument("--z_dim", type=int, default=100, help="dimension of z sampler.")
 opt = parser.parse_args()
 
-def train(model, X_train):
+def alt_train(model, X_train):
 
     d_loss_list = []
     g_loss_list = []
@@ -36,6 +36,7 @@ def train(model, X_train):
         imgs = X_train[idx]
         sketch = mask_image(imgs)
 
+        # Alternate training
         for i in range(5): 
             gen = model.generator.predict(sketch)
             d_loss_real = model.discriminator.train_on_batch(imgs, valid)
@@ -49,19 +50,9 @@ def train(model, X_train):
             g_loss_list.append(g_loss)
             print(g_loss)
 
-
         # ---------------------
         #  Train Discriminator
         # ---------------------
-
-        # # Select a random batch of images
-        # idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
-        # imgs = X_train[idx]
-
-        # # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
-        # sketch = mask_image(imgs)
-
-        # # z_sample = np.random.uniform(-1, 1, size=(opt.batch_size , opt.z_dim))
 
         # # Generate a batch of new images
         gen = model.generator.predict(sketch)
@@ -77,9 +68,6 @@ def train(model, X_train):
 
         g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
 
-        # d_loss_list.append(d_loss)
-        # g_loss_list.append(g_loss[0])
-
         # Plot the progress
         print ("%d [D loss: %f] [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, d_loss, g_loss[0], g_loss[1], g_loss[2]))
         sample_images(gen[1], epoch)
@@ -90,6 +78,59 @@ def train(model, X_train):
         #     visualize_loss(d_loss_list, g_loss_list)
 
 
+def train(model, X_train):
+
+    d_loss_list = []
+    g_loss_list = []
+
+    # Adversarial ground truths
+    valid = np.ones((opt.batch_size, 1))
+    fake = np.zeros((opt.batch_size, 1))
+
+    # X_train = X_train.astype('float32') / 127.5 - 1.
+
+    X_train = X_train.astype('float32') / 255
+
+    for epoch in range(opt.epochs):
+
+        # ---------------------
+        #  Train Discriminator
+        # ---------------------
+
+        # Select a random batch of images
+        idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
+        imgs = X_train[idx]
+
+        # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
+        sketch = mask_image(imgs)
+
+        # z_sample = np.random.uniform(-1, 1, size=(opt.batch_size , opt.z_dim))
+
+        # Generate a batch of new images
+        gen = model.generator.predict(sketch)
+
+        # Train the discriminator
+        d_loss_real = model.discriminator.train_on_batch(imgs, valid)
+        d_loss_fake = model.discriminator.train_on_batch(gen, fake)
+        d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+
+        # ---------------------
+        #  Train Generator 
+        # ---------------------
+
+        g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
+
+        d_loss_list.append(d_loss)
+        g_loss_list.append(g_loss[0])
+
+        # Plot the progress
+        print ("%d [D loss: %f] [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, d_loss, g_loss[0], g_loss[1], g_loss[2]))
+
+        if epoch % opt.sample_interval == 0:
+            sample_images(gen[1], epoch)
+        
+        if epoch % 50 == 0: 
+            visualize_loss(d_loss_list, g_loss_list)
 
 
 def mask_image(imgs):
@@ -145,5 +186,6 @@ if __name__ == '__main__':
     # Import data from preprocess
     train_input = get_data("sample_data/test")
 
-    train(model, train_input)
+    # train(model, train_input)
+    alt_train(model, train_input)
     # print(eval.test(model, test_input, test_labels))
