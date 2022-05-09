@@ -26,8 +26,6 @@ def alt_train(model, X_train):
     valid = np.ones((opt.batch_size, 1))
     fake = np.zeros((opt.batch_size, 1))
 
-    # X_train = X_train.astype('float32') / 127.5 - 1.
-
     X_train = X_train.astype('float32') / 255
 
     for epoch in range(opt.epochs):
@@ -37,7 +35,7 @@ def alt_train(model, X_train):
         sketch = mask_image(imgs)
 
         # Alternate training
-        for i in range(5): 
+        for _ in range(5): 
             gen = model.generator.predict(sketch)
             d_loss_real = model.discriminator.train_on_batch(imgs, valid)
             d_loss_fake = model.discriminator.train_on_batch(gen, fake)
@@ -45,7 +43,7 @@ def alt_train(model, X_train):
             d_loss_list.append(d_loss)
             print(d_loss)
 
-        for i in range(20): 
+        for _ in range(20): 
             g_loss = model.generator.train_on_batch(sketch, [valid, imgs])
             g_loss_list.append(g_loss)
             print(g_loss)
@@ -54,28 +52,23 @@ def alt_train(model, X_train):
         #  Train Discriminator
         # ---------------------
 
-        # # Generate a batch of new images
+        # Generate a batch of new images
         gen = model.generator.predict(sketch)
 
-        # # Train the discriminator
+        # Train the discriminator
         d_loss_real = model.discriminator.train_on_batch(imgs, valid)
         d_loss_fake = model.discriminator.train_on_batch(gen, fake)
         d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
-        # # ---------------------
-        # #  Train Generator 
-        # # ---------------------
+        # ---------------------
+        #  Train Generator 
+        # ---------------------
 
         g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
 
         # Plot the progress
         print ("%d [D loss: %f] [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, d_loss, g_loss[0], g_loss[1], g_loss[2]))
         sample_images(gen[1], epoch)
-        # if epoch % opt.sample_interval == 0:
-        #     sample_images(gen[1], epoch)
-        
-        # if epoch % 50 == 0: 
-        #     visualize_loss(d_loss_list, g_loss_list)
 
 
 def train(model, X_train):
