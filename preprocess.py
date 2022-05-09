@@ -54,7 +54,6 @@ def store_source_img(store_dir, size_lower_limit):
         fo.delete_dataset(dataset_name)
 
     label_field = "ground_truth"
-    classes = ["dog"]
 
     dataset = foz.load_zoo_dataset(
         "coco-2017",
@@ -115,20 +114,12 @@ def adjust_contrast(img):
 
 def pad_resize(img, img_size):
     # pad or resize img to square of side length (img_size)
-    h, w, c = img.shape
-    # white padding
-    color = (255,255,255)
+    # h, w, c = img.shape
+    # # white padding
+    # color = (255,255,255)
 
-    out = None
-
-    if h > img_size or w > img_size:
-        down_points = (img_size, img_size)
-        out = cv2.resize(img, down_points, interpolation=cv2.INTER_LINEAR)
-    else:
-        out = np.full((img_size, img_size, c), color, dtype=np.uint8)
-        x_center = (img_size - w) // 2
-        y_center = (img_size - h) // 2
-        out[y_center: y_center + h, x_center: x_center + w] = img
+    down_points = (img_size, img_size)
+    out = cv2.resize(img, down_points, interpolation=cv2.INTER_LINEAR)
 
     return out
 
