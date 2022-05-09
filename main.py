@@ -32,44 +32,64 @@ def train(model, X_train):
 
     for epoch in range(opt.epochs):
 
+        idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
+        imgs = X_train[idx]
+        sketch = mask_image(imgs)
+
+        for i in range(5): 
+            gen = model.generator.predict(sketch)
+            d_loss_real = model.discriminator.train_on_batch(imgs, valid)
+            d_loss_fake = model.discriminator.train_on_batch(gen, fake)
+            d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+            d_loss_list.append(d_loss)
+            print(d_loss)
+
+        for i in range(20): 
+            g_loss = model.generator.train_on_batch(sketch, [valid, imgs])
+            g_loss_list.append(g_loss)
+            print(g_loss)
+
+
         # ---------------------
         #  Train Discriminator
         # ---------------------
 
-        # Select a random batch of images
-        idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
-        imgs = X_train[idx]
+        # # Select a random batch of images
+        # idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
+        # imgs = X_train[idx]
 
-        # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
-        sketch = mask_image(imgs)
+        # # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
+        # sketch = mask_image(imgs)
 
-        # z_sample = np.random.uniform(-1, 1, size=(opt.batch_size , opt.z_dim))
+        # # z_sample = np.random.uniform(-1, 1, size=(opt.batch_size , opt.z_dim))
 
-        # Generate a batch of new images
+        # # Generate a batch of new images
         gen = model.generator.predict(sketch)
 
-        # Train the discriminator
+        # # Train the discriminator
         d_loss_real = model.discriminator.train_on_batch(imgs, valid)
         d_loss_fake = model.discriminator.train_on_batch(gen, fake)
         d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
-        # ---------------------
-        #  Train Generator 
-        # ---------------------
+        # # ---------------------
+        # #  Train Generator 
+        # # ---------------------
 
         g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
 
-        d_loss_list.append(d_loss)
-        g_loss_list.append(g_loss[0])
+        # d_loss_list.append(d_loss)
+        # g_loss_list.append(g_loss[0])
 
         # Plot the progress
         print ("%d [D loss: %f] [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, d_loss, g_loss[0], g_loss[1], g_loss[2]))
-
-        if epoch % opt.sample_interval == 0:
-            sample_images(gen[1], epoch)
+        sample_images(gen[1], epoch)
+        # if epoch % opt.sample_interval == 0:
+        #     sample_images(gen[1], epoch)
         
-        if epoch % 50 == 0: 
-            visualize_loss(d_loss_list, g_loss_list)
+        # if epoch % 50 == 0: 
+        #     visualize_loss(d_loss_list, g_loss_list)
+
+
 
 
 def mask_image(imgs):
@@ -123,7 +143,7 @@ if __name__ == '__main__':
     # eval = evaluation()
 
     # Import data from preprocess
-    train_input = get_data("sample_data/sketches_grayscale")
+    train_input = get_data("sample_data/test")
 
     train(model, train_input)
     # print(eval.test(model, test_input, test_labels))
