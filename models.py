@@ -2,7 +2,6 @@
 import argparse
 from operator import mod
 import tensorflow as tf
-# import keras.backend as K
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -33,28 +32,28 @@ class ContextualGAN():
 
         self.optimizer = Adam(opt.lr, opt.b)
 
-        # def contextual_loss(y_true, y_pred):
-        #     y_true = tf.image.rgb_to_grayscale(tf.slice(y_true, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
-        #     y_pred = tf.image.rgb_to_grayscale(tf.slice(y_pred, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
-            
-        #     y_true = tf.divide(tf.add(tf.reshape(y_true, [tf.shape(y_true)[0], -1]), 1), 2)
-        #     y_pred = tf.divide(tf.add(tf.reshape(y_pred, [tf.shape(y_pred)[0], -1]), 1), 2)
-                
-        #     # normalize sum to 1
-        #     y_true = tf.divide(y_true, tf.tile(tf.expand_dims(tf.reduce_sum(y_true, axis=1), 1), [1,tf.shape(y_true)[1]]))
-        #     y_pred = tf.divide(y_pred, tf.tile(tf.expand_dims(tf.reduce_sum(y_pred, axis=1), 1), [1,tf.shape(y_pred)[1]]))
-
-        #     return tf.reduce_sum(tf.multiply(y_true, tf.math.log(tf.divide(y_true, y_pred))), axis=1)
-
-        # wgan loss
         def contextual_loss(y_true, y_pred):
             y_true = tf.image.rgb_to_grayscale(tf.slice(y_true, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
             y_pred = tf.image.rgb_to_grayscale(tf.slice(y_pred, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
             
             y_true = tf.divide(tf.add(tf.reshape(y_true, [tf.shape(y_true)[0], -1]), 1), 2)
             y_pred = tf.divide(tf.add(tf.reshape(y_pred, [tf.shape(y_pred)[0], -1]), 1), 2)
+                
+            # normalize sum to 1
+            y_true = tf.divide(y_true, tf.tile(tf.expand_dims(tf.reduce_sum(y_true, axis=1), 1), [1,tf.shape(y_true)[1]]))
+            y_pred = tf.divide(y_pred, tf.tile(tf.expand_dims(tf.reduce_sum(y_pred, axis=1), 1), [1,tf.shape(y_pred)[1]]))
+
+            return tf.reduce_sum(tf.multiply(y_true, tf.math.log(tf.divide(y_true, y_pred))), axis=1)
+
+        # # wgan loss?
+        # def contextual_loss(y_true, y_pred):
+        #     y_true = tf.image.rgb_to_grayscale(tf.slice(y_true, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
+        #     y_pred = tf.image.rgb_to_grayscale(tf.slice(y_pred, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
             
-            return tf.keras.backend.mean(y_true * y_pred)
+        #     y_true = tf.divide(tf.add(tf.reshape(y_true, [tf.shape(y_true)[0], -1]), 1), 2)
+        #     y_pred = tf.divide(tf.add(tf.reshape(y_pred, [tf.shape(y_pred)[0], -1]), 1), 2)
+            
+        #     return tf.keras.backend.mean(y_true * y_pred)
 
         # Build and compile the discriminator
         self.discriminator = self.build_discriminator()
@@ -124,14 +123,8 @@ class ContextualGAN():
         # TODO
         model.add(Input(self.img_shape))
         model.add(Conv2D(opt.df_dim, 5, 2, 'same'))
-        # model.add(BatchNormalization())
-        # model.add(LeakyReLU())
         model.add(Conv2D(opt.df_dim * 2, 5, 2, 'same'))
-        # model.add(BatchNormalization())
-        # model.add(LeakyReLU())
         model.add(Conv2D(opt.df_dim * 4, 5, 2, 'same'))
-        # model.add(BatchNormalization())
-        # model.add(LeakyReLU())
         model.add(Conv2D(opt.df_dim * 8, 5, 2, 'same'))
         model.add(Flatten())
         model.add(Dense(1, 'softmax'))
