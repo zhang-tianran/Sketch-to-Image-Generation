@@ -48,7 +48,7 @@ def alt_train(model, X_train):
         # ---------------------
         #  Train Generator 
         # ---------------------
-        for _ in range(20): 
+        for _ in range(5): 
             idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
             imgs = X_train[idx]
             sketch = mask_image(imgs)
