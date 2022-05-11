@@ -30,24 +30,30 @@ def alt_train(model, X_train):
 
     for epoch in range(opt.epochs):
 
-        idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
-        imgs = X_train[idx]
-        sketch = mask_image(imgs)
-
         # Alternate training
         for _ in range(5): 
+            idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
+            imgs = X_train[idx]
+            sketch = mask_image(imgs)
             gen = model.generator.predict(sketch)
             d_loss_real = model.discriminator.train_on_batch(imgs, valid)
             d_loss_fake = model.discriminator.train_on_batch(gen, fake)
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
             d_loss_list.append(d_loss)
-            print(d_loss)
+            print(f'D loss: {d_loss}')
 
         for _ in range(20): 
+            idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
+            imgs = X_train[idx]
+            sketch = mask_image(imgs)
             g_loss = model.generator.train_on_batch(sketch, [valid, imgs])
             g_loss_list.append(g_loss)
-            print(g_loss)
+            print(f'G loss: {g_loss}')
 
+
+        idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
+        imgs = X_train[idx]
+        sketch = mask_image(imgs)
         # ---------------------
         #  Train Discriminator
         # ---------------------
