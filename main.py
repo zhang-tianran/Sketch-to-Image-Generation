@@ -62,7 +62,8 @@ def alt_train(model, X_train):
         sketch = mask_image(imgs)
         gen = model.generator.predict(sketch)
         sample_images(gen[0], epoch)
-        if epoch % 50 == 0:
+        if epoch != 0 and epoch % 100 == 0:
+            visualize_loss(d_loss_list, g_loss_list)
             save_model(model)
 
 
@@ -148,7 +149,8 @@ def visualize_loss(d_loss, g_loss):
     plt.title('Loss per batch')
     plt.xlabel('Batch')
     plt.ylabel('Loss')
-    plt.show()  
+    plt.savefig('saved_img/loss.png')
+    plt.close()
 
 def save_model(model):
     """
