@@ -161,13 +161,12 @@ def get_data(input_dir):
     return inputs
 
 def main():
-    # store_dir = "/home/sli144/course/cs1470/final_project/dl_final_project/sample_data"
-    # store_dir = "sample_data"
-    # size_lower_limit = 40
-    # store_source_img(store_dir, size_lower_limit)
+    store_dir = "sample_data/images_64"
+    size_lower_limit = 64
+    store_source_img(store_dir, size_lower_limit)
 
-    from_dir = "/home/sli144/course/cs1470/final_project/Sketch-to-Image-Generation/sample_data/images"
-    to_dir = "/home/sli144/course/cs1470/final_project/Sketch-to-Image-Generation/sample_data/sketches_grayscale"
+    from_dir = "sample_data/images_64"
+    to_dir = "sample_data/sketches_64"
     img_size = 64
     generate_data(from_dir, to_dir, img_size)
 
