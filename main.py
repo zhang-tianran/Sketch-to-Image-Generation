@@ -62,8 +62,8 @@ def alt_train(model, X_train):
         sketch = mask_image(imgs)
         gen = model.generator.predict(sketch)
         sample_images(gen[0], epoch)
-        if epoch != 0 and epoch % 50 == 0:
-            visualize_loss(d_loss_list, g_loss_list)
+        if epoch != 0 and epoch % 30 == 0:
+            visualize_loss(d_loss_list, g_loss_list, epoch)
             save_model(model)
 
 def train(model, X_train):
@@ -136,7 +136,7 @@ def sample_images(img, epoch):
     plt.close()
 
 
-def visualize_loss(d_loss, g_loss): 
+def visualize_loss(d_loss, g_loss, epoch): 
     """
     Uses Matplotlib to visualize the losses of our model.
     :param losses: list of loss data stored from train. Can use the model's loss_list 
@@ -148,7 +148,7 @@ def visualize_loss(d_loss, g_loss):
     plt.title('Loss per batch')
     plt.xlabel('Batch')
     plt.ylabel('Loss')
-    plt.savefig('saved_img/loss.png')
+    plt.savefig(f'saved_img/loss{epoch}.png')
     plt.close()
 
 def save_model(model):
