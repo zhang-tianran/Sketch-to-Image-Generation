@@ -64,8 +64,7 @@ def alt_train(model, X_train):
         sample_images(gen[0], epoch)
         if epoch != 0 and epoch % 50 == 0:
             visualize_loss(d_loss_list, g_loss_list)
-            # save_model(model)
-
+            save_model(model)
 
 def train(model, X_train):
 
