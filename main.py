@@ -17,6 +17,7 @@ parser.add_argument("--sample_interval", type=int, default=10, help="interval be
 parser.add_argument("--z_dim", type=int, default=100, help="dimension of z sampler.")
 opt = parser.parse_args()
 
+# Alternate training
 def alt_train(model, X_train):
 
     d_loss_list = []
@@ -30,7 +31,9 @@ def alt_train(model, X_train):
 
     for epoch in range(opt.epochs):
 
-        # Alternate training
+        # ---------------------
+        #  Train Discriminator
+        # ---------------------
         for _ in range(5): 
             idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
             imgs = X_train[idx]
@@ -42,39 +45,23 @@ def alt_train(model, X_train):
             d_loss_list.append(d_loss)
             print(f'D loss: {d_loss}')
 
+        # ---------------------
+        #  Train Generator 
+        # ---------------------
         for _ in range(20): 
             idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
             imgs = X_train[idx]
             sketch = mask_image(imgs)
-            g_loss = model.generator.train_on_batch(sketch, [valid, imgs])
-            g_loss_list.append(g_loss)
-            print(f'G loss: {g_loss}')
+            g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
+            g_loss_list.append(g_loss[0])
+            print ("[G loss: %f, perceptual loss: %f, contextual loss: %f]" % (g_loss[0], g_loss[1], g_loss[2]))
 
-
+        # Plot the progress
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
         imgs = X_train[idx]
         sketch = mask_image(imgs)
-        # ---------------------
-        #  Train Discriminator
-        # ---------------------
-
-        # Generate a batch of new images
         gen = model.generator.predict(sketch)
-
-        # Train the discriminator
-        d_loss_real = model.discriminator.train_on_batch(imgs, valid)
-        d_loss_fake = model.discriminator.train_on_batch(gen, fake)
-        d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
-
-        # ---------------------
-        #  Train Generator 
-        # ---------------------
-
-        g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
-
-        # Plot the progress
-        print ("%d [D loss: %f] [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, d_loss, g_loss[0], g_loss[1], g_loss[2]))
-        sample_images(gen[1], epoch)
+        sample_images(gen[0], epoch)
 
 
 def train(model, X_train):
