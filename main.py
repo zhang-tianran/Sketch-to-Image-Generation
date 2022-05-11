@@ -43,7 +43,7 @@ def alt_train(model, X_train):
             d_loss_fake = model.discriminator.train_on_batch(gen, fake)
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
             d_loss_list.append(d_loss)
-            print(f'D loss: {d_loss}')
+            print(f'Epoch: {epoch}, D loss: {d_loss}')
 
         # ---------------------
         #  Train Generator 
@@ -54,7 +54,7 @@ def alt_train(model, X_train):
             sketch = mask_image(imgs)
             g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
             g_loss_list.append(g_loss[0])
-            print ("[G loss: %f, perceptual loss: %f, contextual loss: %f]" % (g_loss[0], g_loss[1], g_loss[2]))
+            print ("Epoch: %d [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, g_loss[0], g_loss[1], g_loss[2]))
 
         # Plot the progress
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
@@ -62,6 +62,8 @@ def alt_train(model, X_train):
         sketch = mask_image(imgs)
         gen = model.generator.predict(sketch)
         sample_images(gen[0], epoch)
+        if epoch % 50 == 0:
+            save_model(model)
 
 
 def train(model, X_train):
