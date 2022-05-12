@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # eval = evaluation()
 
     # Import data from preprocess
-    train_input = get_data("sample_data/sketches_64")
+    train_input = get_data("sample_data/sketch_person")
 
     # train(model, train_input)
     alt_train(model, train_input)
