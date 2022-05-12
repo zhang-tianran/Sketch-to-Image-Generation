@@ -3,9 +3,9 @@ import tensorflow as tf
 import os
 import glob
 import cv2
-# import fiftyone as fo
-# import fiftyone.zoo as foz
-# from fiftyone import ViewField as F
+import fiftyone as fo
+import fiftyone.zoo as foz
+from fiftyone import ViewField as F
 
 
 def get_images_paths(directory_name, image_type='png'):
@@ -53,21 +53,22 @@ def store_source_img(store_dir, size_lower_limit):
         fo.delete_dataset(dataset_name)
 
     label_field = "ground_truth"
+    classes = ["car"]
 
     dataset = foz.load_zoo_dataset(
         "coco-2017",
         split="validation",
         label_types=["segmentations"],
-        # classes=classes,
+        classes=classes,
         # max_samples=10,
         label_field=label_field,
         dataset_name=dataset_name,
         shuffle=True,
     )
 
-    # view = dataset.filter_labels(label_field, F("label").is_in(classes))
+    view = dataset.filter_labels(label_field, F("label").is_in(classes))
     os.makedirs(store_dir, exist_ok=True)
-    extract_classwise_instances(dataset, store_dir, label_field, size_lower_limit)
+    extract_classwise_instances(view, store_dir, label_field, size_lower_limit)
 
 def image_to_sketch(img, kernel_size=21):
     """
@@ -161,12 +162,12 @@ def get_data(input_dir):
     return inputs
 
 def main():
-    store_dir = "sample_data/images_64"
+    store_dir = "sample_data/new_cars"
     size_lower_limit = 64
     store_source_img(store_dir, size_lower_limit)
 
-    from_dir = "sample_data/images_64"
-    to_dir = "sample_data/sketches_64"
+    from_dir = "sample_data/new_cars"
+    to_dir = "sample_data/car_sketches"
     img_size = 64
     generate_data(from_dir, to_dir, img_size)
 
