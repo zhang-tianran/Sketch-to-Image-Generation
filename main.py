@@ -148,7 +148,7 @@ def visualize_loss(d_loss, g_loss, epoch):
     plt.title('Loss per batch')
     plt.xlabel('Batch')
     plt.ylabel('Loss')
-    plt.savefig(f'saved_img/loss{epoch}.png')
+    plt.savefig(f'saved_img4/loss{epoch}.png')
     plt.close()
 
 def save_model(model):
