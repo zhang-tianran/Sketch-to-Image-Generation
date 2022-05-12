@@ -1,5 +1,7 @@
 # Sketch to Image Generation
 
+![poster](assets/Poster.png)
+
 ## Introduction
 
 To explore the utilization of deep learning in artistic expression, we build a model that converts hand-drawn sketches to photo-like images, allowing people without artistic backgrounds to see the visual graphics of their work. 
