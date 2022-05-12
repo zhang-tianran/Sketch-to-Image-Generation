@@ -62,7 +62,7 @@ def alt_train(model, X_train):
         gen = model.generator.predict(sketch)
         sample_images(gen[0], epoch)
         if epoch % 50 == 0:
-            save_model(model)
+            visualize_loss(d_loss_list, g_loss_list, epoch)
 
 
 def train(model, X_train):
@@ -73,8 +73,6 @@ def train(model, X_train):
     # Adversarial ground truths
     valid = np.ones((opt.batch_size, 1))
     fake = np.zeros((opt.batch_size, 1))
-
-    # X_train = X_train.astype('float32') / 127.5 - 1.
 
     X_train = X_train.astype('float32') / 255
 
@@ -88,7 +86,6 @@ def train(model, X_train):
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
         imgs = X_train[idx]
 
-        # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
         sketch = mask_image(imgs)
 
         # Generate a batch of new images
@@ -113,7 +110,7 @@ def train(model, X_train):
 
         if epoch % opt.sample_interval == 0:
             sample_images(gen[1], epoch)
-            visualize_loss(d_loss_list, g_loss_list)
+            visualize_loss(d_loss_list, g_loss_list, epoch)
 
 
 def mask_image(imgs):
@@ -128,11 +125,11 @@ def sample_images(img, epoch):
     img = img.astype('float32')[:,:,::-1]
     img = np.clip(img, 0, 1)
     plt.imshow(img)
-    plt.savefig(f'saved_img4/{epoch}.png')
+    plt.savefig(f'saved_img/{epoch}.png')
     plt.close()
 
 
-def visualize_loss(d_loss, g_loss): 
+def visualize_loss(d_loss, g_loss, epoch): 
     """
     Uses Matplotlib to visualize the losses of our model.
     :param losses: list of loss data stored from train. Can use the model's loss_list 
@@ -144,16 +141,8 @@ def visualize_loss(d_loss, g_loss):
     plt.title('Loss per batch')
     plt.xlabel('Batch')
     plt.ylabel('Loss')
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    plt.savefig(f'saved_img4/loss{epoch}.png')
+    plt.savefig(f'saved_img/loss{epoch}.png')
     plt.close()
-=======
-    plt.show()  
->>>>>>> Stashed changes
-=======
-    plt.show()  
->>>>>>> Stashed changes
 
 
 def save_model(model):
