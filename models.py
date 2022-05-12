@@ -45,26 +45,13 @@ class ContextualGAN():
 
             return tf.reduce_sum(tf.multiply(y_true, tf.math.log(tf.divide(y_true, y_pred))), axis=1)
 
-        # # wgan loss?
-        # def contextual_loss(y_true, y_pred):
-        #     y_true = tf.image.rgb_to_grayscale(tf.slice(y_true, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
-        #     y_pred = tf.image.rgb_to_grayscale(tf.slice(y_pred, [0,0,0,0], [opt.batch_size, self.img_rows, self.img_cols, self.channels]))
-            
-        #     y_true = tf.divide(tf.add(tf.reshape(y_true, [tf.shape(y_true)[0], -1]), 1), 2)
-        #     y_pred = tf.divide(tf.add(tf.reshape(y_pred, [tf.shape(y_pred)[0], -1]), 1), 2)
-            
-        #     return tf.keras.backend.mean(y_true * y_pred)
-
         # Build and compile the discriminator
         self.discriminator = self.build_discriminator()
         self.discriminator.compile(loss='binary_crossentropy',
             optimizer=self.optimizer)
 
-        # # Build the generator
+        # Build the generator
         self.generator = self.build_generator()
-
-        # self.generator.compile(loss='binary_crossentropy',
-        #     optimizer=self.optimizer)
 
         # The generator takes noise as input and generates the missing
         # part of the image
@@ -110,7 +97,7 @@ class ContextualGAN():
         model.add(LeakyReLU())
         model.add(Activation('tanh'))
 
-        # model.summary()
+        model.summary()
 
         masked_img = Input(shape=self.img_shape)
         gen_missing = model(masked_img)
@@ -121,7 +108,6 @@ class ContextualGAN():
 
         model = Sequential()
 
-        # TODO
         model.add(Input(self.img_shape))
         model.add(Conv2D(opt.df_dim, 5, 2, 'same'))
         model.add(Conv2D(opt.df_dim * 2, 5, 2, 'same'))
@@ -130,7 +116,7 @@ class ContextualGAN():
         model.add(Flatten())
         model.add(Dense(1, 'softmax'))
 
-        # model.summary()
+        model.summary()
 
         img = Input(shape=self.img_shape)
         validity = model(img)

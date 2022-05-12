@@ -2,7 +2,6 @@
 
 import argparse
 import numpy as np
-# import cv2
 
 from matplotlib import pyplot as plt
 
@@ -92,8 +91,6 @@ def train(model, X_train):
         # masked_imgs, missing_parts, _ = model.mask_randomly(imgs)
         sketch = mask_image(imgs)
 
-        # z_sample = np.random.uniform(-1, 1, size=(opt.batch_size , opt.z_dim))
-
         # Generate a batch of new images
         gen = model.generator.predict(sketch)
 
@@ -116,8 +113,6 @@ def train(model, X_train):
 
         if epoch % opt.sample_interval == 0:
             sample_images(gen[1], epoch)
-        
-        if epoch % 50 == 0: 
             visualize_loss(d_loss_list, g_loss_list)
 
 
@@ -127,6 +122,7 @@ def mask_image(imgs):
     sketches = np.copy(imgs)
     sketches[:, :, mask_shape // 2:, :] = 1.0
     return sketches
+
 
 def sample_images(img, epoch):
     img = img.astype('float32')[:,:,::-1]
@@ -151,6 +147,7 @@ def visualize_loss(d_loss, g_loss, epoch):
     plt.savefig(f'saved_img4/loss{epoch}.png')
     plt.close()
 
+
 def save_model(model):
     """
     input param: model is the trained GAN model including both generator and discrinminator 
@@ -164,11 +161,9 @@ def load_model(model):
     model.discriminator = tf.keras.models.load_model("saved_model/discriminator")
     model.generator = tf.keras.models.load_model("saved_model/generator")
 
+
 if __name__ == '__main__':
     model = ContextualGAN()
-        
-    # save_model(model)
-    # load_model(model)
 
     # eval = evaluation()
 
