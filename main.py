@@ -34,7 +34,7 @@ def alt_train(model, X_train):
         # ---------------------
         #  Train Discriminator
         # ---------------------
-        for _ in range(10): 
+        for _ in range(5): 
             idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
             imgs = X_train[idx]
             sketch = mask_image(imgs)
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # eval = evaluation()
 
     # Import data from preprocess
-    train_input = get_data("sample_data/donuts")
+    train_input = get_data("sample_data/buses")
 
     # train(model, train_input)
     alt_train(model, train_input)
