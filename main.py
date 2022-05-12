@@ -168,7 +168,7 @@ if __name__ == '__main__':
     model = ContextualGAN()
         
     # save_model(model)
-    # load_model(model)
+    load_model(model)
 
     # eval = evaluation()
 
