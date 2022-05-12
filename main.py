@@ -54,7 +54,7 @@ def alt_train(model, X_train):
             sketch = mask_image(imgs)
             g_loss = model.combined.train_on_batch(sketch, [valid, imgs])
             g_loss_list.append(g_loss[0])
-            print ("Epoch: %d, [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, g_loss[0], g_loss[1], g_loss[2]))
+            print ("Epoch: %d [G loss: %f, perceptual loss: %f, contextual loss: %f]" % (epoch, g_loss[0], g_loss[1], g_loss[2]))
 
         # Plot the progress
         idx = np.random.randint(0, X_train.shape[0], opt.batch_size)
@@ -62,9 +62,9 @@ def alt_train(model, X_train):
         sketch = mask_image(imgs)
         gen = model.generator.predict(sketch)
         sample_images(gen[0], epoch)
-        if epoch != 0 and epoch % 30 == 0:
-            visualize_loss(d_loss_list, g_loss_list, epoch)
+        if epoch % 50 == 0:
             save_model(model)
+
 
 def train(model, X_train):
 
@@ -132,11 +132,11 @@ def sample_images(img, epoch):
     img = img.astype('float32')[:,:,::-1]
     img = np.clip(img, 0, 1)
     plt.imshow(img)
-    plt.savefig(f'saved_img/{epoch}.png')
+    plt.savefig(f'saved_img4/{epoch}.png')
     plt.close()
 
 
-def visualize_loss(d_loss, g_loss, epoch): 
+def visualize_loss(d_loss, g_loss): 
     """
     Uses Matplotlib to visualize the losses of our model.
     :param losses: list of loss data stored from train. Can use the model's loss_list 
@@ -148,8 +148,16 @@ def visualize_loss(d_loss, g_loss, epoch):
     plt.title('Loss per batch')
     plt.xlabel('Batch')
     plt.ylabel('Loss')
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
     plt.savefig(f'saved_img4/loss{epoch}.png')
     plt.close()
+=======
+    plt.show()  
+>>>>>>> Stashed changes
+=======
+    plt.show()  
+>>>>>>> Stashed changes
 
 def save_model(model):
     """
@@ -173,7 +181,7 @@ if __name__ == '__main__':
     # eval = evaluation()
 
     # Import data from preprocess
-    train_input = get_data("sample_data/buses")
+    train_input = get_data("sample_data/test")
 
     # train(model, train_input)
     alt_train(model, train_input)
